@@ -7,7 +7,7 @@ CHUNK_SAMPLES = int(TARGET_SR * CHUNK_DURATION)
 
 MODEL_DIR = Path("models/")
 HEAR_MODEL_PATH = MODEL_DIR / "hear_model_local"
-PIPELINE_PATH = MODEL_DIR / "hear_pipeline.joblib"
+PIPELINE_PATH = MODEL_DIR / "acoustic_pipeline.joblib"
 
 FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}
 

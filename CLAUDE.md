@@ -49,15 +49,17 @@ Uses the official Google HeAR preprocessing. Clones `https://github.com/google-h
 3. `model.forward(processed_tensor, return_dict=True, output_hidden_states=True)`
 4. Extract `pooler_output` (512-dim)
 
-### Current Classifier (SVC)
-Using `SVC(kernel='linear', probability=True)` with group-aware data splitting to prevent subject-level leakage.
+### Current Classifier (LogisticRegression)
+Using `LogisticRegression(class_weight='balanced')` with group-aware data splitting to prevent subject-level leakage.
 - Hold-out split: `GroupShuffleSplit` (ensures no subject appears in both train and test)
 - CV: `StratifiedGroupKFold(n_splits=5)` (prevents leakage during cross-validation too)
-- Pipeline: `StandardScaler → PCA → SVC(kernel='linear', class_weight='balanced', probability=True)`
-- Grid search: `pca__n_components` ∈ {10, 20, 30, 50, 0.95}, `svm__C` ∈ {0.001, 0.01, 0.1, 1, 10}
-- `probability=True` gives native `predict_proba` — no CalibratedClassifierCV wrapper needed for fusion
+- Pipeline: `StandardScaler → PCA → LogisticRegression(class_weight='balanced')`
+- Grid search: `pca__n_components` ∈ {10, 20, 30, 50, 0.95}, `clf__C` ∈ {0.001, 0.01, 0.1, 1, 10}
+- LogReg produces native, well-calibrated probabilities — no Platt scaling needed. This matters because Prob A feeds directly into weighted fusion.
 
-**Note:** The notebook also contains a LinearSVC variant (Cell 20, no group splitting) and a LogisticRegression variant (Cell 22). These are experimental; the SVC variant in Cell 21 is the one moving forward.
+**Why LogReg over SVC:** SVC with `probability=True` uses Platt scaling which can produce probabilities inconsistent with predictions (e.g., predicted=1 but P(dementia)=0.36). LogReg and SVC achieve near-identical performance on this dataset (~0.47 F1, ~0.71 AUC-ROC), so we pick the model with natively consistent probabilities.
+
+**Note:** The notebook also contains a LinearSVC variant (Cell 20, no group splitting) and an SVC variant (Cell 21). These are superseded; LogisticRegression (Cell 22) is the one moving forward.
 
 ---
 
@@ -73,17 +75,17 @@ dementia-screening/
 │   ├── graph.py                # Main LangGraph graph wiring all agents
 │   ├── audio_process.py        # ← from HeAR.ipynb Cell 6: load_and_chunk_audio()
 │   ├── hear_embed.py           # ← from HeAR.ipynb Cell 14: extract_hear_embeddings() (Version 2)
-│   ├── classifier_acoustic.py  # ← from HeAR.ipynb Cell 21: SVC predict_proba at inference
+│   ├── classifier_acoustic.py  # ← from HeAR.ipynb Cell 22: LogReg predict_proba at inference
 │   ├── transcription.py        # MERaLiON-AudioLLM (LLM-driven, ASR + Singlish)
 │   ├── feature_calc.py         # Linguistic feature extraction (cognitive footprints)
 │   ├── classifier_semantic.py  # Classifier Model 2 (on linguistic features)
 │   ├── fusion.py               # Weighted decision fusion (Prob = w1*A + w2*B)
 │   └── report.py               # Report agent (LLM-driven, Gemini 1.5 Pro)
 ├── training/                   # Offline scripts — run once on Colab, produce artifacts
-│   └── train_acoustic.py       # GridSearchCV + model saving (from HeAR.ipynb Cells 2, 15, 21)
+│   └── train_acoustic.py       # GridSearchCV + model saving (from HeAR.ipynb Cells 2, 15, 22)
 ├── models/                     # Trained model artifacts (gitignored, produced by training/)
 │   ├── hear_model_local/       # HeAR weights saved via model.save_pretrained()
-│   ├── acoustic_pipeline.joblib # Fitted StandardScaler → PCA → SVC pipeline
+│   ├── acoustic_pipeline.joblib # Fitted StandardScaler → PCA → LogReg pipeline
 │   └── model_metadata.json     # Best params, versions, metrics for reproducibility
 ├── utils/                      # Shared utilities
 │   └── config.py               # All constants, paths, thresholds (single source of truth)
@@ -102,9 +104,9 @@ dementia-screening/
 | Cell 13 | HeAR repo clone + `preprocess_audio` import | `agents/hear_embed.py` | Shared by training AND inference |
 | Cell 14 | `extract_hear_embeddings()` | `agents/hear_embed.py` | Shared by training AND inference |
 | Cell 15 | Batch embedding extraction loop | `training/train_acoustic.py` | Training-only |
-| Cell 21 | SVC with GroupShuffleSplit + GridSearchCV | `training/train_acoustic.py` | Training-only |
+| Cell 22 | LogReg with GroupShuffleSplit + GridSearchCV | `training/train_acoustic.py` | Training-only — chosen classifier |
 | Cell 20 | LinearSVC (no group split) | DISCARD | Deprecated — causes leakage, no probability output |
-| Cell 22 | LogisticRegression | DISCARD (or keep as experiment) | SVC Cell 21 is the chosen variant |
+| Cell 21 | SVC (group split) | DISCARD | Superseded by LogReg — Platt scaling causes inconsistent probabilities |
 
 **Critical:** `agents/audio_process.py` and `agents/hear_embed.py` are imported by both `training/train_acoustic.py` and the inference graph. This guarantees identical preprocessing between training and inference — no skew possible.
 
@@ -114,7 +116,7 @@ dementia-screening/
 `audio_process → hear_embed → classifier_acoustic`
 - Preprocessing: Librosa loads at 16kHz mono, chunks into strict 2s segments (discard short tails)
 - HeAR: official `preprocess_audio` → model forward → 512-dim `pooler_output`, averaged per file
-- Classifier: SVC(kernel='linear', probability=True) → **Prob A (Vocal Frailty Score)** via `predict_proba`
+- Classifier: LogisticRegression(class_weight='balanced') → **Prob A (Vocal Frailty Score)** via `predict_proba`
 
 **Semantic Branch (starts with LLM-driven agent):**
 `transcription → feature_calc → classifier_semantic`
@@ -238,14 +240,14 @@ Script: `training/train_acoustic.py`
 
 | Artifact | Method | Contains |
 |---|---|---|
-| `acoustic_pipeline.joblib` | `joblib.dump(grid_search.best_estimator_, ...)` | Fitted `StandardScaler → PCA → SVC` pipeline (includes PCA transform matrix) |
+| `acoustic_pipeline.joblib` | `joblib.dump(grid_search.best_estimator_, ...)` | Fitted `StandardScaler → PCA → LogisticRegression` pipeline (includes PCA transform matrix) |
 | `hear_model_local/` | `model.save_pretrained(...)` | HeAR weights for offline loading (no HF token needed) |
 | `model_metadata.json` | `json.dump(...)` | Best params, CV F1, sklearn/torch/librosa versions |
 
 ### Inference (runs per request in the LangGraph pipeline)
 - `agents/hear_embed.py` loads HeAR from `models/hear_model_local/` (no network needed)
 - `agents/classifier_acoustic.py` loads `models/acoustic_pipeline.joblib` via `joblib.load()`
-- The joblib file contains the full fitted pipeline — calling `pipeline.predict_proba()` applies the exact same `StandardScaler` transform, PCA projection, and SVC prediction as training
+- The joblib file contains the full fitted pipeline — calling `pipeline.predict_proba()` applies the exact same `StandardScaler` transform, PCA projection, and LogisticRegression prediction as training
 
 ### Version Pinning
 `model_metadata.json` records the sklearn, torch, and librosa versions used during training. At inference time, verify these match — sklearn pipelines are NOT guaranteed compatible across versions. Use `requirements.txt` to lock versions across both environments.
@@ -279,7 +281,7 @@ FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}  # hyperparameters, tune lat
 - **Semantic Model**: MERaLiON-AudioLLM (A*STAR, via cr8lab API)
 - **Reporting LLM**: Gemini 1.5 Pro
 - **Audio Processing**: Librosa (loading + chunking only; spectrogram handled by HeAR official code)
-- **ML**: scikit-learn — SVC(kernel='linear', probability=True) with GroupShuffleSplit / StratifiedGroupKFold
+- **ML**: scikit-learn — LogisticRegression(class_weight='balanced') with GroupShuffleSplit / StratifiedGroupKFold
 - **Model Serialization**: `joblib` for sklearn pipelines, `save_pretrained` for HeAR
 - **State Management**: Pydantic BaseModel (`AgentState` with `arbitrary_types_allowed` for numpy fields)
 - **Language**: Python 3.10+
@@ -289,14 +291,15 @@ FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}  # hyperparameters, tune lat
 - Always use official `preprocess_audio` for HeAR input — never compute mel-spectrograms manually
 - Data splitting must be group-aware (by subject_id) to prevent leakage — use GroupShuffleSplit for hold-out, StratifiedGroupKFold for CV
 - MERaLiON access is via cr8lab API — treat as external service with latency
-- SVC chosen for small dataset (455 samples) — revisit if dataset grows significantly
+- LogisticRegression chosen over SVC for native probability calibration — critical since Prob A feeds into weighted fusion. Revisit classifier choice if dataset grows significantly
 - Fusion weights (w1, w2) are hyperparameters; start with equal weighting
 - Reports must never give a diagnosis — screening tool only, always include disclaimer
 - `np.ndarray` fields in `AgentState` require `arbitrary_types_allowed = True` in the Pydantic Config. These won't serialize natively if LangGraph checkpointing is enabled — store as lists or `.npy` paths if persistence is needed (not an issue for synchronous Streamlit use)
 
 ## What NOT To Do
 - Do not compute mel-spectrograms manually for HeAR — the Version 1 approach is deprecated
-- Do not use LinearSVC for the classifier — it lacks native probability output; use SVC(kernel='linear', probability=True)
+- Do not use LinearSVC for the classifier — it lacks native probability output
+- Do not use SVC(probability=True) — Platt scaling produces probabilities inconsistent with predictions; use LogisticRegression instead
 - Do not split data without grouping by subject_id — this causes leakage between train/test
 - Do not use openSMILE features — HeAR embeddings replace handcrafted features
 - Do not hardcode API keys — use environment variables or .env
