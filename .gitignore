@@ -1,7 +1,9 @@
 .env
 /data
 /hear
-/models
+/models/hear_model_local/
+!/models/acoustic_pipeline.joblib
+!/models/model_metadata.json
 
 # Python
 __pycache__/
