@@ -1,3 +1,10 @@
+"""Audio transcription agent — loads a WAV file and processes it for transcription.
+
+LLM-driven agent.
+Reads:  state.audio_path
+Writes: state.transcript_text, state.meralion_acoustic_analysis, state.meralion_cognitive_insights, state.messages, state.errors
+"""
+
 import os
 import time
 import httpx
