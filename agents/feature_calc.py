@@ -459,7 +459,7 @@ def extract_linguistic_features(transcript_text: str) -> tuple[dict, dict, str]:
                          may contain <Speaker N> tags.
 
     Returns:
-        features:     dict of 25 numeric features for the classifier
+        features:     dict of 31 numeric features for the classifier
         speaker_info: dict with speaker separation metadata
         lang:         detected language key ('en' or 'zh')
     """

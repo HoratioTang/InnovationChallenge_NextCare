@@ -223,7 +223,7 @@ audio_process (entry) ────┤                                         �
 ```
 
 ### Skill Files
-Each agent has a `.skill.md` in `agents/skills/` defining: agent type (organizational / LLM-driven), inputs (which AgentState fields it reads), outputs (which fields it writes), constraints, and for LLM-driven agents, the system prompt content.
+Each agent has a `.skill.md` in `agents/skills/` defining: agent type (organizational / LLM-driven), inputs (which AgentState fields it reads), outputs (which fields it writes), constraints, and for LLM-driven agents, the system prompt content. The file should contains two parts: a YAML header and a Markdown body. The YAML header is a lightweight index entry, the only part read at startup.
 
 **When creating a new agent, write the skill file first.**
 
