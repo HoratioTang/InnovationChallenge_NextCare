@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pydantic import BaseModel, Field
 import numpy as np
 
@@ -59,6 +59,7 @@ class AgentState(BaseModel):
     # flags: Annotated[list[str], operator.add]
 
     # ---- Error tracking ----
-    # errors: Annotated[list[str], operator.add]
+    errors: List[str] = Field(default_factory=list)
+
     class Config:
         arbitrary_types_allowed = True
