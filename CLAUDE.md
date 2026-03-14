@@ -87,8 +87,7 @@ dementia-screening/
 │   ├── hear_model_local/       # HeAR weights saved via model.save_pretrained()
 │   ├── acoustic_pipeline.joblib # Fitted StandardScaler → PCA → LogReg pipeline
 │   └── model_metadata.json     # Best params, versions, metrics for reproducibility
-├── utils/                      # Shared utilities
-│   └── config.py               # All constants, paths, thresholds (single source of truth)
+├── config.py                   # All constants, paths, thresholds (single source of truth)
 ├── tests/
 ├── requirements.txt
 ├── CLAUDE.md
@@ -254,7 +253,7 @@ Script: `training/train_acoustic.py`
 
 ---
 
-## Shared Constants (`utils/config.py`)
+## Shared Constants (`config.py`)
 Single source of truth for all magic numbers. Both training and inference import from here:
 
 ```python
