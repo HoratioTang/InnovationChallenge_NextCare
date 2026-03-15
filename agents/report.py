@@ -11,21 +11,16 @@ Writes: state.report, state.messages, state.errors
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from config import REPORT_LLM_PROVIDER, REPORT_LLM_MODEL
+from agents.skill_store import load_skill
 
 if TYPE_CHECKING:
     from agents.state import AgentState
-
-# ---------------------------------------------------------------------------
-# Skill file path (system prompt source)
-# ---------------------------------------------------------------------------
-_SKILL_PATH = Path(__file__).parent / "skills" / "report.skill.md"
 
 # ---------------------------------------------------------------------------
 # Module-level singleton for the LLM
@@ -59,13 +54,8 @@ def _get_llm():
 
 
 def _load_system_prompt() -> str:
-    """Read the skill file and extract everything after the YAML frontmatter."""
-    raw = _SKILL_PATH.read_text(encoding="utf-8")
-    # Strip YAML frontmatter (between first and second '---')
-    parts = raw.split("---", 2)
-    if len(parts) >= 3:
-        return parts[2].strip()
-    return raw.strip()
+    """Load the system prompt from the skill file via skill_store."""
+    return load_skill("report").prompt
 
 
 def _build_user_message(state: AgentState) -> str:
