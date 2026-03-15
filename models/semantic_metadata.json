@@ -1,0 +1,45 @@
+{
+  "model_type": "LogisticRegression",
+  "pipeline_steps": [
+    "StandardScaler",
+    "LogisticRegression"
+  ],
+  "best_params": {
+    "clf__C": 0.01
+  },
+  "cv_f1_mean": 0.38757501727481447,
+  "cv_f1_std": 0.06912566170970175,
+  "holdout_f1": 0.5333333333333333,
+  "holdout_auc_roc": 0.7319711538461539,
+  "holdout_accuracy": 0.6111111111111112,
+  "n_train_clips": 355,
+  "n_test_clips": 90,
+  "n_train_subjects": 169,
+  "n_test_subjects": 43,
+  "n_features": 6,
+  "feature_names": [
+    "mattr",
+    "ttr_raw",
+    "pronoun_to_noun_ratio",
+    "topic_drift",
+    "semantic_coherence_std",
+    "discourse_filler_rate"
+  ],
+  "label_distribution": {
+    "train": {
+      "0": 250,
+      "1": 105
+    },
+    "test": {
+      "0": 64,
+      "1": 26
+    }
+  },
+  "versions": {
+    "sklearn": "1.7.1",
+    "numpy": "2.1.3",
+    "pandas": "2.3.1"
+  },
+  "trained_at": "2026-03-15T23:05:58.318080",
+  "notes": "Semantic branch classifier for dementia screening. Input: 6 selected linguistic features from feature_calc.py. Output: P(dementia) via predict_proba. Group-aware splitting by interviewee to prevent leakage. Features: ['mattr', 'ttr_raw', 'pronoun_to_noun_ratio', 'topic_drift', 'semantic_coherence_std', 'discourse_filler_rate']"
+}
