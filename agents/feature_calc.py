@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 agents/feature_calc.py — Linguistic Feature Extraction Agent (Organizational)
 
@@ -400,46 +402,70 @@ def _extract_syntactic_features(doc) -> dict:
     }
 
 
-def _extract_coherence_features(sentences: list[str], lang: str) -> dict:
-    """Semantic coherence via TF-IDF or sentence-transformers."""
+def _compute_coherence_tfidf(sentences: list[str], lang: str) -> dict:
+    """Lightweight coherence via TF-IDF cosine similarity."""
     if len(sentences) < 2:
         return {'semantic_coherence_mean': 1.0, 'semantic_coherence_std': 0.0,
                 'semantic_coherence_min': 1.0, 'repetitiveness_score': 0.0,
                 'topic_drift': 0.0}
 
-    # Compute embeddings / vectors
-    if USE_SENTENCE_TRANSFORMERS and _st_model is not None:
-        embeddings = _st_model.encode(sentences, show_progress_bar=False)
-        adjacent_sims = [
-            float(cosine_similarity(embeddings[i:i+1], embeddings[i+1:i+2])[0, 0])
-            for i in range(len(embeddings) - 1)
-        ]
-        rep_threshold = 0.85
+    if lang == 'zh':
+        vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(1, 3), max_features=5000)
     else:
-        if lang == 'zh':
-            vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(1, 3), max_features=5000)
-        else:
-            vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
-        try:
-            tfidf_matrix = vectorizer.fit_transform(sentences)
-        except ValueError:
-            return {'semantic_coherence_mean': 0.0, 'semantic_coherence_std': 0.0,
-                    'semantic_coherence_min': 0.0, 'repetitiveness_score': 0.0,
-                    'topic_drift': 0.0}
-        adjacent_sims = [
-            float(cosine_similarity(tfidf_matrix[i:i+1], tfidf_matrix[i+1:i+2])[0, 0])
-            for i in range(len(sentences) - 1)
-        ]
-        rep_threshold = 0.5
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+
+    try:
+        tfidf_matrix = vectorizer.fit_transform(sentences)
+    except ValueError:
+        return {'semantic_coherence_mean': 0.0, 'semantic_coherence_std': 0.0,
+                'semantic_coherence_min': 0.0, 'repetitiveness_score': 0.0,
+                'topic_drift': 0.0}
+
+    adjacent_sims = [
+        float(cosine_similarity(tfidf_matrix[i:i+1], tfidf_matrix[i+1:i+2])[0, 0])
+        for i in range(len(sentences) - 1)
+    ]
 
     sims = np.array(adjacent_sims)
     return {
         'semantic_coherence_mean': float(np.mean(sims)),
         'semantic_coherence_std': float(np.std(sims)) if len(sims) > 1 else 0.0,
         'semantic_coherence_min': float(np.min(sims)),
-        'repetitiveness_score': float(np.mean(sims > rep_threshold)),
+        'repetitiveness_score': float(np.mean(sims > 0.5)),
         'topic_drift': float(np.std(sims)) if len(sims) > 1 else 0.0,
     }
+
+
+def _compute_coherence_sbert(sentences: list[str]) -> dict:
+    """Higher-quality coherence via sentence-transformers (multilingual)."""
+    if len(sentences) < 2:
+        return {'semantic_coherence_mean': 1.0, 'semantic_coherence_std': 0.0,
+                'semantic_coherence_min': 1.0, 'repetitiveness_score': 0.0,
+                'topic_drift': 0.0}
+
+    embeddings = _st_model.encode(sentences, show_progress_bar=False)
+
+    adjacent_sims = [
+        float(cosine_similarity(embeddings[i:i+1], embeddings[i+1:i+2])[0, 0])
+        for i in range(len(embeddings) - 1)
+    ]
+
+    sims = np.array(adjacent_sims)
+    return {
+        'semantic_coherence_mean': float(np.mean(sims)),
+        'semantic_coherence_std': float(np.std(sims)) if len(sims) > 1 else 0.0,
+        'semantic_coherence_min': float(np.min(sims)),
+        'repetitiveness_score': float(np.mean(sims > 0.85)),
+        'topic_drift': float(np.std(sims)) if len(sims) > 1 else 0.0,
+    }
+
+
+def _extract_coherence_features(sentences: list[str], lang: str) -> dict:
+    """Dispatch to TF-IDF or SBERT based on config."""
+    if USE_SENTENCE_TRANSFORMERS and _st_model is not None:
+        return _compute_coherence_sbert(sentences)
+    else:
+        return _compute_coherence_tfidf(sentences, lang)
 
 
 # ============================================================

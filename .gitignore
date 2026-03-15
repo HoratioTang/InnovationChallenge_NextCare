@@ -20,3 +20,4 @@ Thumbs.db
 .DS_Store
 
 /example_output_from_meralion
+/tests
