@@ -93,3 +93,16 @@ ZH_FILLERS_UH = {'啊', '呢', '哦'}
 ZH_FILLERS_DISCOURSE = {'就是', '然后', '那个', '这个', '怎么说'}
  
 ZH_EMPTY_TERMS = {'东西', '那个', '这个', '什么', '那边', '这边', '那里', '这里'}
+
+# ============================================================
+# Report Agent LLM Settings
+# ============================================================
+# Toggle: comment/uncomment ONE of the two blocks below.
+
+# --- Option A: Google Gemini (production) ---
+# REPORT_LLM_PROVIDER = "gemini"
+# REPORT_LLM_MODEL = "gemini-1.5-pro"
+
+# --- Option B: Local Ollama (testing) ---
+REPORT_LLM_PROVIDER = "ollama"
+REPORT_LLM_MODEL = "qwen2.5:3b"

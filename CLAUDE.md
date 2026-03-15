@@ -79,6 +79,7 @@ dementia-screening/
 │   ├── transcription.py        # MERaLiON-AudioLLM (LLM-driven, ASR + Singlish)
 │   ├── feature_calc.py         # Linguistic feature extraction (cognitive footprints)
 │   ├── classifier_semantic.py  # Classifier Model 2 (on linguistic features)
+│   ├── skill_store.py          # Utility: loads .skill.md files for LLM-driven agents at runtime
 │   ├── fusion.py               # Weighted decision fusion (Prob = w1*A + w2*B)
 │   └── report.py               # Report agent (LLM-driven, Gemini 1.5 Pro)
 ├── training/                   # Offline scripts — run once on Colab, produce artifacts
