@@ -298,29 +298,9 @@ FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}  # hyperparameters, tune lat
 - Reports must never give a diagnosis — screening tool only, always include disclaimer
 - `np.ndarray` fields in `AgentState` require `arbitrary_types_allowed = True` in the Pydantic Config. These won't serialize natively if LangGraph checkpointing is enabled — store as lists or `.npy` paths if persistence is needed (not an issue for synchronous Streamlit use)
 
-## Streamlit UI — Pipeline Integration
+## Streamlit UI
 
-The Streamlit app (`app/streamlit_app.py`) currently uses **mock data** because `fusion_agent` is not yet implemented. Once fusion is complete, wire the real pipeline by following the `PIPELINE INTEGRATION POINT` comment block in the file. The swap is:
-
-```python
-# In app/streamlit_app.py, replace _run_mock_pipeline() with:
-from agents.graph import build_graph
-
-@st.cache_resource
-def _get_pipeline():
-    return build_graph()
-
-def _run_pipeline(audio_path, subject_id, language_code, file_name):
-    pipeline = _get_pipeline()
-    return pipeline.invoke({
-        "audio_file_path": audio_path,       # str: path to saved .wav
-        "subject_id": subject_id,            # str: e.g. "anonymous"
-        "report_language": language_code,     # str: "en" or "zh"
-        "file_name": file_name,              # str: original filename
-    })
-```
-
-The returned dict contains the keys the UI reads: `acoustic_result`, `semantic_result`, `fusion_result`, `report`, `messages`. After wiring, delete `MOCK_RESULT` and `_run_mock_pipeline()`.
+The Streamlit app (`app/streamlit_app.py`) is wired to the real LangGraph pipeline via `build_graph()`. The compiled graph is cached with `@st.cache_resource` so models load once. Uploaded audio is saved to a temp file, passed to `pipeline.invoke()`, and results are stored in `st.session_state` to survive Streamlit reruns. Running the app: `streamlit run app/streamlit_app.py --server.headless true`.
 
 ## What NOT To Do
 - Do not compute mel-spectrograms manually for HeAR — the Version 1 approach is deprecated
