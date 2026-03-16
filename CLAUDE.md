@@ -180,14 +180,16 @@ class AgentState(BaseModel):
 ```
 
 ### Agent Function Signature
-Every agent is a **plain function** (not a class). Signature: `(state: AgentState) -> AgentState`. Each agent reads what it needs via dot access, mutates only the fields it owns, appends to `messages` for logging, and returns the state object.
+Every agent is a **plain function** (not a class). Signature: `(state: AgentState) -> dict`. Each agent reads what it needs via dot access and returns a dict containing **only the fields it owns** plus `messages`. LangGraph merges the partial dict into the state. This is required for parallel fan-out — returning the full state object causes `InvalidUpdateError` when two branches write concurrently.
 
 ```python
 # Example: agents/audio_process.py
-def audio_process_agent(state: AgentState) -> AgentState:
-    state.audio_chunks = load_and_chunk_audio(state.audio_file_path)
-    state.messages.append(f"[audio_process] Produced {len(state.audio_chunks)} chunks.")
-    return state
+def audio_process_agent(state: AgentState) -> dict:
+    chunks = load_and_chunk_audio(state.audio_file_path)
+    return {
+        "audio_chunks": chunks,
+        "messages": [f"[audio_process] Produced {len(chunks)} chunks."],
+    }
 ```
 
 ### Two Agent Types
@@ -215,12 +217,12 @@ def my_agent(state: AgentState) -> AgentState:
 This avoids reloading multi-GB models on every graph invocation while keeping the agent function itself stateless.
 
 ### Graph Wiring
-`agents/graph.py` is the only file that knows execution order. Agent files do not import each other. The graph fans out from `audio_process` to both branches in parallel, then converges at `fusion`:
+`agents/graph.py` is the only file that knows execution order. Agent files do not import each other. Both branches fan out from `START` in parallel (the semantic branch does not need `audio_process`), then converge at `fusion`:
 
 ```
-                          ┌→ hear_embed → classifier_acoustic ──────┐
-audio_process (entry) ────┤                                         ├→ fusion → report (finish)
-                          └→ transcription → feature_calc → classifier_semantic ┘
+START ─┬→ audio_process → hear_embed → classifier_acoustic ────────┐
+       │                                                            ├→ fusion → report (finish)
+       └→ transcription → feature_calc → classifier_semantic ───────┘
 ```
 
 ### Skill Files
@@ -296,6 +298,30 @@ FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}  # hyperparameters, tune lat
 - Reports must never give a diagnosis — screening tool only, always include disclaimer
 - `np.ndarray` fields in `AgentState` require `arbitrary_types_allowed = True` in the Pydantic Config. These won't serialize natively if LangGraph checkpointing is enabled — store as lists or `.npy` paths if persistence is needed (not an issue for synchronous Streamlit use)
 
+## Streamlit UI — Pipeline Integration
+
+The Streamlit app (`app/streamlit_app.py`) currently uses **mock data** because `fusion_agent` is not yet implemented. Once fusion is complete, wire the real pipeline by following the `PIPELINE INTEGRATION POINT` comment block in the file. The swap is:
+
+```python
+# In app/streamlit_app.py, replace _run_mock_pipeline() with:
+from agents.graph import build_graph
+
+@st.cache_resource
+def _get_pipeline():
+    return build_graph()
+
+def _run_pipeline(audio_path, subject_id, language_code, file_name):
+    pipeline = _get_pipeline()
+    return pipeline.invoke({
+        "audio_file_path": audio_path,       # str: path to saved .wav
+        "subject_id": subject_id,            # str: e.g. "anonymous"
+        "report_language": language_code,     # str: "en" or "zh"
+        "file_name": file_name,              # str: original filename
+    })
+```
+
+The returned dict contains the keys the UI reads: `acoustic_result`, `semantic_result`, `fusion_result`, `report`, `messages`. After wiring, delete `MOCK_RESULT` and `_run_mock_pipeline()`.
+
 ## What NOT To Do
 - Do not compute mel-spectrograms manually for HeAR — the Version 1 approach is deprecated
 - Do not use LinearSVC for the classifier — it lacks native probability output
@@ -305,10 +331,11 @@ FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}  # hyperparameters, tune lat
 - Do not hardcode API keys — use environment variables or .env
 - Do not put training logic (GridSearchCV, data loading) inside agent files — training lives in `training/`, agents are inference-only
 - Do not make agent functions import other agent files — agents communicate only through AgentState; only `graph.py` knows the wiring
-- Do not use classes for agent nodes — agents are plain functions `(AgentState) -> AgentState`
+- Do not use classes for agent nodes — agents are plain functions `(AgentState) -> dict`
 - Do not mutate AgentState fields that another agent owns — each agent only writes its own fields (see field ownership comments in `state.py`)
-- Do not use TypedDict for AgentState — we use Pydantic BaseModel with dot access and mutate-return pattern
-- Do not use dict-key access (`state["field"]`) — use dot access (`state.field`) for consistency with Pydantic
+- Do not use TypedDict for AgentState — we use Pydantic BaseModel with dot access
+- Do not return the full AgentState from agent functions — return a partial dict of only owned fields (required for parallel fan-out)
+- Do not use dict-key access (`state["field"]`) when reading state — use dot access (`state.field`) for consistency with Pydantic
 - Do not reload heavy models per invocation — use the module-level singleton pattern
 - Do not use `pickle` for sklearn pipelines — use `joblib` (better for large numpy arrays)
 - Do not assume sklearn pipeline compatibility across versions — check `model_metadata.json`
