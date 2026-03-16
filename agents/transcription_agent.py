@@ -13,7 +13,7 @@ import pathlib
 import tempfile
 import soundfile as sf
 from dotenv import load_dotenv
-from langgraph import AgentState
+from agents.state import AgentState
 
 
 # --- Audio Preprocessing ---
@@ -71,7 +71,7 @@ class MeralionAPIHandler:
             if os.path.exists(temp_path): os.remove(temp_path)
 
 # --- Transcription Agent ---
-def transcription_agent(state: AgentState) -> AgentState:
+def transcription_agent(state: AgentState) -> dict:
     """
     Transcription agent that processes audio files using MERaLiON API and updates the state with results.
     """
@@ -79,23 +79,25 @@ def transcription_agent(state: AgentState) -> AgentState:
     api_key = os.getenv("MERALION_API_KEY")
 
     if not api_key:
-        state.errors = "Missing MERALION_API_KEY"
-        state.messages.append("[transcription_agent] Error: API Key missing.")
-        return state
+        return {
+            "errors": ["[transcription_agent] Missing MERALION_API_KEY"],
+            "messages": ["[transcription_agent] Error: API Key missing."],
+        }
 
     handler = MeralionAPIHandler(api_key)
 
     try:
         results = handler.run_transcription_pipeline(state.audio_file_path)
 
-        state.transcript_text = results["transcript"]
-        state.meralion_acoustic_analysis = results["acoustic"]
-        state.meralion_cognitive_insights = results["cognitive"]
-
-        state.messages.append(f"[transcription_agent] Successfully processed {state.file_name}")
+        return {
+            "transcript_text": results["transcript"],
+            "meralion_acoustic_analysis": results["acoustic"],
+            "meralion_cognitive_insights": results["cognitive"],
+            "messages": [f"[transcription_agent] Successfully processed {state.file_name}"],
+        }
 
     except Exception as e:
-        state.errors = str(e)
-        state.messages.append(f"[transcription_agent] Exception occurred: {str(e)}")
-
-    return state
+        return {
+            "errors": [f"[transcription_agent] {e}"],
+            "messages": [f"[transcription_agent] Exception occurred: {e}"],
+        }

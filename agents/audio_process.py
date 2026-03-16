@@ -47,10 +47,10 @@ def load_and_chunk_audio(
     return chunks
 
 
-def audio_process_agent(state: AgentState) -> AgentState:
-    """LangGraph node: load and chunk the audio file in state.audio_path."""
-    state.audio_chunks = load_and_chunk_audio(state.audio_file_path)
-    state.messages.append(
-        f"[audio_process] Produced {len(state.audio_chunks)} chunks from {state.audio_file_path}."
-    )
-    return state
+def audio_process_agent(state: AgentState) -> dict:
+    """LangGraph node: load and chunk the audio file in state.audio_file_path."""
+    chunks = load_and_chunk_audio(state.audio_file_path)
+    return {
+        "audio_chunks": chunks,
+        "messages": [f"[audio_process] Produced {len(chunks)} chunks from {state.audio_file_path}."],
+    }

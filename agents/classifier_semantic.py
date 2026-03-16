@@ -46,18 +46,17 @@ def _get_feature_names() -> list[str]:
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
-def classifier_semantic_agent(state: AgentState) -> AgentState:
+def classifier_semantic_agent(state: AgentState) -> dict:
     """LangGraph node: predict dementia probability from linguistic features."""
     pipeline = _get_pipeline()
     feature_names = _get_feature_names()
 
     features = state.linguistic_features
     if features is None:
-        state.semantic_result = None
-        state.messages.append(
-            "[classifier_semantic] Skipped — linguistic_features is None"
-        )
-        return state
+        return {
+            "semantic_result": None,
+            "messages": ["[classifier_semantic] Skipped — linguistic_features is None"],
+        }
 
     # Build feature array in the exact column order used during training
     values = []
@@ -73,8 +72,7 @@ def classifier_semantic_agent(state: AgentState) -> AgentState:
     # Column index 1 is P(dementia) — the positive class
     prob_dementia = float(pipeline.predict_proba(X)[0, 1])
 
-    state.semantic_result = prob_dementia
-    state.messages.append(
-        f"[classifier_semantic] Cognitive Footprint Score (Prob B): {prob_dementia:.4f}"
-    )
-    return state
+    return {
+        "semantic_result": prob_dementia,
+        "messages": [f"[classifier_semantic] Cognitive Footprint Score (Prob B): {prob_dementia:.4f}"],
+    }

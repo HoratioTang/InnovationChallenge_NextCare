@@ -33,7 +33,7 @@ def _get_pipeline():
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
-def classifier_acoustic_agent(state: AgentState) -> AgentState:
+def classifier_acoustic_agent(state: AgentState) -> dict:
     """LangGraph node: predict dementia probability from the HeAR embedding."""
     pipeline = _get_pipeline()
 
@@ -43,8 +43,7 @@ def classifier_acoustic_agent(state: AgentState) -> AgentState:
     # Column index 1 is P(dementia) — the positive class
     prob_dementia = float(pipeline.predict_proba(X)[0, 1])
 
-    state.acoustic_result = prob_dementia
-    state.messages.append(
-        f"[classifier_acoustic] Vocal Frailty Score (Prob A): {prob_dementia:.4f}"
-    )
-    return state
+    return {
+        "acoustic_result": prob_dementia,
+        "messages": [f"[classifier_acoustic] Vocal Frailty Score (Prob A): {prob_dementia:.4f}"],
+    }

@@ -1,22 +1,20 @@
-from typing import Any, Optional, List
-from pydantic import BaseModel, Field
+import operator
+from typing import Annotated, Any, List, Optional
+
 import numpy as np
+from pydantic import BaseModel, Field
 
 class AgentState(BaseModel):
     """
-    Top-level state for the LangGraph graph.
+    Top-level state for the LangGraph graph (Pydantic BaseModel).
 
-    Uses TypedDict (LangGraph convention) with `total=False` so that
-    fields are optional — they get populated progressively as agents run.
+    Fields are populated progressively as agents run. Each agent
+    returns a dict of only the fields it owns; LangGraph merges them.
 
-    Fields with `Annotated[..., operator.add]` are append-reducers:
-    when multiple agents write to them, values are concatenated rather
-    than overwritten. This is used for `flags` since both branches
-    contribute flags independently during parallel execution.
-
-    numpy arrays (audio_chunks, embedding) are stored as plain fields.
-    LangGraph handles serialization; Pydantic models above handle
-    validation of the structured outputs.
+    Fields annotated with ``operator.add`` are append-reducers:
+    when parallel branches both write to them, values are concatenated
+    rather than raising an InvalidUpdateError. Used for ``messages``
+    and ``errors`` since both branches log independently.
     """
 
     # ---- Input (set before graph execution) ----
@@ -25,11 +23,11 @@ class AgentState(BaseModel):
     report_language: str                    # Preferred report language: "en", "zh", "ms"
     file_name: str
 
-    # ---- System Log ----
-    messages: list[str] = Field(default_factory=list)
+    # ---- System Log (reducer: concurrent branches concatenate) ----
+    messages: Annotated[list[str], operator.add] = Field(default_factory=list)
 
     # ---- Audio Process Agent output ----
-    audio_chunks: list[np.ndarray]          # List of 2s chunks, each shape (32000,) at 16kHz
+    audio_chunks: list[np.ndarray] = Field(default_factory=list)  # List of 2s chunks, each shape (32000,) at 16kHz
     # audio_metadata: AudioMetadata
 
     # ---- HeAR Embed Agent output ----
@@ -39,9 +37,9 @@ class AgentState(BaseModel):
     acoustic_result: Optional[float] = None 
 
     # ---- Transcription Agent output (LLM-driven) ----
-    transcript_text: str                         # Raw ASR transcript from MERaLiON
-    meralion_acoustic_analysis: str
-    meralion_cognitive_insights: str
+    transcript_text: str = ""                         # Raw ASR transcript from MERaLiON
+    meralion_acoustic_analysis: str = ""
+    meralion_cognitive_insights: str = ""
 
     # ---- Feature Calculation Agent output ----
     linguistic_features: Optional[dict[str, Any]] = None  # e.g. word count, sentiment scores, etc.
@@ -58,8 +56,8 @@ class AgentState(BaseModel):
     # ---- Shared accumulator (both branches append) ----
     # flags: Annotated[list[str], operator.add]
 
-    # ---- Error tracking ----
-    errors: List[str] = Field(default_factory=list)
+    # ---- Error tracking (reducer: concurrent branches concatenate) ----
+    errors: Annotated[list[str], operator.add] = Field(default_factory=list)
 
     class Config:
         arbitrary_types_allowed = True
