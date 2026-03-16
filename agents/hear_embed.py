@@ -109,15 +109,15 @@ def extract_hear_embeddings(
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
-def hear_embed_agent(state: AgentState) -> AgentState:
+def hear_embed_agent(state: AgentState) -> dict:
     """LangGraph node: extract HeAR embeddings from state.audio_chunks."""
     model = _get_model()
-    state.embedding = extract_hear_embeddings(
+    embedding = extract_hear_embeddings(
         state.audio_chunks, model, preprocess_audio, DEVICE
     )
     n_chunks = len(state.audio_chunks)
-    emb_shape = state.embedding.shape if state.embedding is not None else None
-    state.messages.append(
-        f"[hear_embed] Extracted embedding {emb_shape} from {n_chunks} chunks."
-    )
-    return state
+    emb_shape = embedding.shape if embedding is not None else None
+    return {
+        "embedding": embedding,
+        "messages": [f"[hear_embed] Extracted embedding {emb_shape} from {n_chunks} chunks."],
+    }

@@ -555,7 +555,7 @@ def _empty_features() -> dict:
 # LangGraph Node
 # ============================================================
 
-def feature_calc_agent(state: AgentState) -> AgentState:
+def feature_calc_agent(state: AgentState) -> dict:
     """
     LangGraph node: extract linguistic features from transcript.
 
@@ -564,8 +564,6 @@ def feature_calc_agent(state: AgentState) -> AgentState:
 
     Writes:
         state.linguistic_features   (dict — feature vector for classifier)
-        state.speaker_info          (dict — speaker separation metadata)
-        state.detected_language     (str  — 'en' or 'zh')
         state.messages              (appends log entry)
     """
     transcript = state.transcript_text or ''
@@ -573,23 +571,18 @@ def feature_calc_agent(state: AgentState) -> AgentState:
     try:
         features, speaker_info, lang = extract_linguistic_features(transcript)
 
-        state.linguistic_features = features
-        # state.speaker_info = speaker_info
-        # state.detected_language = lang
-
-        # Log
         n_words = features.get('total_word_count', 0)
         review_flag = ' [NEEDS SPEAKER REVIEW]' if speaker_info['needs_review'] else ''
-        state.messages.append(
-            f"[feature_calc_agent] Extracted {len(features)} features "
-            f"({n_words} words, lang={lang}){review_flag}"
-        )
+        return {
+            "linguistic_features": features,
+            "messages": [
+                f"[feature_calc_agent] Extracted {len(features)} features "
+                f"({n_words} words, lang={lang}){review_flag}"
+            ],
+        }
 
     except Exception as e:
-        state.linguistic_features = _empty_features()
-        # state.speaker_info = {'needs_review': True, 'reason': f'Exception: {e}'}
-        # state.detected_language = 'en'
-        # state.errors = str(e)
-        state.messages.append(f"[feature_calc_agent] Exception: {e}")
-
-    return state
+        return {
+            "linguistic_features": _empty_features(),
+            "messages": [f"[feature_calc_agent] Exception: {e}"],
+        }

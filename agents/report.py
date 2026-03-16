@@ -112,7 +112,7 @@ def _build_user_message(state: AgentState) -> str:
 # ---------------------------------------------------------------------------
 # LangGraph node
 # ---------------------------------------------------------------------------
-def report_agent(state: AgentState) -> AgentState:
+def report_agent(state: AgentState) -> dict:
     """LangGraph node: generate a caregiver-facing screening report."""
     try:
         llm = _get_llm()
@@ -124,14 +124,16 @@ def report_agent(state: AgentState) -> AgentState:
             HumanMessage(content=user_message),
         ])
 
-        state.report = response.content
-        state.messages.append(
-            f"[report_agent] Report generated ({len(response.content)} chars, "
-            f"lang={state.report_language}, provider={REPORT_LLM_PROVIDER})"
-        )
+        return {
+            "report": response.content,
+            "messages": [
+                f"[report_agent] Report generated ({len(response.content)} chars, "
+                f"lang={state.report_language}, provider={REPORT_LLM_PROVIDER})"
+            ],
+        }
 
     except Exception as e:
-        state.errors.append(f"[report_agent] {e}")
-        state.messages.append(f"[report_agent] Failed: {e}")
-
-    return state
+        return {
+            "errors": [f"[report_agent] {e}"],
+            "messages": [f"[report_agent] Failed: {e}"],
+        }
