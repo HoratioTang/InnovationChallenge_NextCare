@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 import streamlit as st
+from pydub import AudioSegment
 
 # Ensure project root is on sys.path so agent imports resolve
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -48,6 +49,31 @@ def _run_pipeline(audio_path, subject_id, language_code, file_name):
         "report_language": language_code,
         "file_name": file_name,
     })
+
+
+# =====================================================================
+# Audio format conversion
+# =====================================================================
+
+SUPPORTED_FORMATS = ["wav", "m4a", "mp3", "ogg", "flac"]
+
+
+def _ensure_wav(file_path: str) -> str:
+    """Convert audio file to 16kHz mono WAV if needed. Returns path to WAV file."""
+    path = Path(file_path)
+    if path.suffix.lower() == ".wav":
+        return file_path
+
+    audio = AudioSegment.from_file(file_path)
+    audio = audio.set_frame_rate(16000).set_channels(1)
+
+    wav_path = path.with_suffix(".wav")
+    audio.export(str(wav_path), format="wav")
+
+    # Remove the original non-wav temp file
+    path.unlink(missing_ok=True)
+
+    return str(wav_path)
 
 
 # =====================================================================
@@ -129,8 +155,8 @@ with tab_upload:
 
     uploaded_file = st.file_uploader(
         "Choose an audio file",
-        type=["wav"],
-        help="Supported format: WAV (16-bit PCM). Mono or stereo.",
+        type=SUPPORTED_FORMATS,
+        help="Supported formats: WAV, M4A, MP3, OGG, FLAC. Files are converted to WAV automatically.",
     )
 
     col1, col2 = st.columns(2)
@@ -157,11 +183,15 @@ with tab_upload:
             st.info("Results already available — switch to the **Screening Report** tab.")
         else:
             # Save uploaded file to a temp path (pipeline reads from disk)
+            suffix = Path(uploaded_file.name).suffix or ".wav"
             with tempfile.NamedTemporaryFile(
-                suffix=".wav", delete=False
+                suffix=suffix, delete=False
             ) as tmp:
                 tmp.write(uploaded_file.getbuffer())
                 temp_path = tmp.name
+
+            # Convert to 16kHz mono WAV if needed
+            temp_path = _ensure_wav(temp_path)
 
             language_code = LANGUAGES[language]
 
