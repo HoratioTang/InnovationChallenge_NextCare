@@ -74,7 +74,7 @@ GEMINI_API_KEY=<your Google AI API key>   # only if using Gemini for reports
 - **MERALION_API_KEY** — required for the transcription agent (MERaLiON via cr8lab API).
 - **GEMINI_API_KEY** — required only if `REPORT_LLM_PROVIDER` is set to `"gemini"` in `config.py`.
 
-By default the report agent uses a local Ollama instance (`qwen2.5:3b`). To use this, install [Ollama](https://ollama.com) and pull the model:
+The report agent also uses a local Ollama instance (for example `qwen2.5:3b`). To use this, install [Ollama](https://ollama.com) and pull the model:
 
 ```bash
 ollama pull qwen2.5:3b
