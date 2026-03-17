@@ -88,6 +88,24 @@ If users will upload audio in M4A, MP3, OGG, or FLAC format, [FFmpeg](https://ff
 
 ## Running the App
 
+### Option A: React Frontend (same UI as demo)
+
+Start the FastAPI backend and the React dev server:
+
+```bash
+# Terminal 1 — API server
+uvicorn app.api:app --reload --port 8000
+
+# Terminal 2 — React frontend
+cd Innovation_front
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The React UI supports in-browser mic recording and file upload, with real-time progress and a styled screening report.
+
+### Option B: Streamlit (quick, lightweight test)
+
 ```bash
 streamlit run app/streamlit_app.py --server.headless true
 ```
@@ -96,7 +114,7 @@ The Streamlit UI provides:
 1. **Upload Audio** tab — upload a recording (WAV, M4A, MP3, OGG, or FLAC), select report language, enter a subject ID, and run the screening pipeline.
 2. **Screening Report** tab — view the acoustic score, semantic score, fused score, and the full LLM-generated report.
 
-The LangGraph pipeline is compiled once and cached for the session. Subsequent screenings reuse the loaded models.
+Both frontends use the same LangGraph pipeline. Models are loaded once and reused across requests.
 
 ---
 
@@ -104,7 +122,8 @@ The LangGraph pipeline is compiled once and cached for the session. Subsequent s
 
 ```
 ├── app/
-│   └── streamlit_app.py          # Streamlit frontend
+│   ├── streamlit_app.py          # Streamlit frontend
+│   └── api.py                    # FastAPI backend for React frontend
 ├── agents/
 │   ├── state.py                  # AgentState (Pydantic BaseModel)
 │   ├── graph.py                  # LangGraph wiring
@@ -156,4 +175,20 @@ The LangGraph pipeline is compiled once and cached for the session. Subsequent s
 | python-dotenv | 1.2.1 | BSD-3-Clause | https://github.com/theskumar/python-dotenv |
 | Pydantic | 2.11.7 | MIT | https://docs.pydantic.dev |
 | PyYAML | 6.0.2 | MIT | https://pyyaml.org |
+| FastAPI | — | MIT | https://fastapi.tiangolo.com |
+| uvicorn | — | BSD-3-Clause | https://www.uvicorn.org |
+| python-multipart | — | Apache-2.0 | https://github.com/Kludex/python-multipart |
 | MERaLiON-AudioLLM | — | ASTAR Research License | https://huggingface.co/MERaLiON |
+| React | 19.0.0 | MIT | https://react.dev |
+| React DOM | 19.0.0 | MIT | https://react.dev |
+| react-markdown | 10.1.0 | MIT | https://github.com/remarkjs/react-markdown |
+| Motion (Framer Motion) | 12.23.24 | MIT | https://motion.dev |
+| Lucide React | 0.546.0 | ISC | https://lucide.dev |
+| MUI Material | 7.3.9 | MIT | https://mui.com |
+| MUI Icons Material | 7.3.9 | MIT | https://mui.com |
+| Emotion React | 11.14.0 | MIT | https://emotion.sh |
+| Emotion Styled | 11.14.1 | MIT | https://emotion.sh |
+| Tailwind CSS | 4.1.14 | MIT | https://tailwindcss.com |
+| @tailwindcss/typography | 0.5.19 | MIT | https://github.com/tailwindlabs/tailwindcss-typography |
+| Vite | 6.2.0 | MIT | https://vite.dev |
+| TypeScript | 5.8.2 | Apache-2.0 | https://www.typescriptlang.org |

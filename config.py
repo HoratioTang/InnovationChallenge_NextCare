@@ -100,9 +100,9 @@ ZH_EMPTY_TERMS = {'东西', '那个', '这个', '什么', '那边', '这边', '�
 # Toggle: comment/uncomment ONE of the two blocks below.
 
 # --- Option A: Google Gemini (production) ---
-# REPORT_LLM_PROVIDER = "gemini"
-# REPORT_LLM_MODEL = "gemini-1.5-pro"
+REPORT_LLM_PROVIDER = "gemini"
+REPORT_LLM_MODEL = "gemini-2.5-flash"
 
 # --- Option B: Local Ollama (testing) ---
-REPORT_LLM_PROVIDER = "ollama"
-REPORT_LLM_MODEL = "qwen2.5:3b"
+# REPORT_LLM_PROVIDER = "ollama"
+# REPORT_LLM_MODEL = "qwen2.5:3b"

@@ -24,6 +24,11 @@ langchain-ollama==1.0.1
 # Frontend
 streamlit==1.55.0
 
+# API
+fastapi
+uvicorn
+python-multipart
+
 # HTTP & Config
 httpx==0.28.1
 python-dotenv==1.2.1

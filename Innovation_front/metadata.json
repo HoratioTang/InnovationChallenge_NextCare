@@ -1,0 +1,5 @@
+{
+  "name": "NextCare",
+  "description": "AI-powered dementia screening and cognitive health assessment.",
+  "requestFramePermissions": ["microphone"]
+}
