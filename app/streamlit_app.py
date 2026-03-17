@@ -266,12 +266,26 @@ with tab_report:
             st.markdown("**Summary**")
             # Extract first paragraph of report as quick summary
             report_text = result.get("report", "")
-            paragraphs = [p.strip() for p in report_text.split("\n\n") if p.strip()]
-            # Find first non-heading paragraph
-            for p in paragraphs:
-                if not p.startswith("#"):
-                    st.write(p)
+            # Extract lines, drop headings and short greetings, take first substantial paragraph
+            lines = [
+                ln.strip() for ln in report_text.split("\n")
+                if ln.strip() and not ln.strip().startswith("#")
+            ]
+            # Rejoin consecutive non-heading lines into paragraphs (split on blank-line gaps)
+            # Since we already dropped blanks, group by original double-newline blocks
+            blocks = report_text.split("\n\n")
+            summary = None
+            for block in blocks:
+                # Strip heading lines within the block
+                content = "\n".join(
+                    ln for ln in block.strip().split("\n")
+                    if ln.strip() and not ln.strip().startswith("#")
+                )
+                if len(content) >= 50:
+                    summary = content
                     break
+            if summary:
+                st.write(summary)
 
         st.divider()
 
