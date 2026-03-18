@@ -147,10 +147,17 @@ Both frontends use the same LangGraph pipeline. Models are loaded once and reuse
 
 ---
 
+## Dataset Attribution
+
+The audio data used for training and evaluation comes from [**DementiaNet**](https://github.com/shreyasgite/dementianet) by Shreyas Gite — a longitudinal spontaneous speech dataset for dementia screening. It contains recordings of public figures with confirmed dementia diagnoses and control subjects who lived beyond 90 without cognitive decline. DementiaNet is released under the **MIT License** (Copyright (c) 2022 Shreyas Gite).
+
+---
+
 ## Third-Party Licenses
 
 | Package | Version | License | URL |
 |---------|---------|---------|-----|
+| DementiaNet (dataset) | — | MIT | https://github.com/shreyasgite/dementianet |
 | PyTorch (`torch`) | 2.10.0 | BSD-3-Clause | https://pytorch.org |
 | torchaudio | 2.10.0 | BSD-2-Clause | https://github.com/pytorch/audio |
 | Transformers | 5.0.0 | Apache-2.0 | https://github.com/huggingface/transformers |
