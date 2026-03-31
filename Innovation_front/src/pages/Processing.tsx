@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { runScreening } from '../services/api';
+import { runScreening, exportPdf } from '../services/api';
 import type { ScreeningResult } from '../types';
 
 interface ProcessingProps {
@@ -48,6 +48,21 @@ export const Processing: FC<ProcessingProps> = ({
   onCancel,
   onShowSummary,
 }) => {
+  const handleDownload = async () => {
+    if (!results) return;
+    try {
+      const blob = await exportPdf(results);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nextcare-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF download failed:', err);
+    }
+  };
+
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState(1);
   const [isDone, setIsDone] = useState(false);
@@ -193,7 +208,7 @@ export const Processing: FC<ProcessingProps> = ({
                         View Summary
                       </Button>
                       <div className="flex gap-3">
-                        <Button variant="secondary" fullWidth icon={<Download size={18} />}>
+                        <Button variant="secondary" fullWidth icon={<Download size={18} />} onClick={handleDownload}>
                           Download
                         </Button>
                         <Button variant="secondary" fullWidth icon={<ExternalLink size={18} />} onClick={onComplete}>

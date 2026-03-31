@@ -1,8 +1,8 @@
 """NextCare — FastAPI backend for the React frontend.
 
-Single endpoint: POST /api/screen
-Accepts an audio file + metadata, runs the LangGraph pipeline,
-returns screening results as JSON.
+Endpoints:
+  POST /api/screen       — Run screening pipeline on uploaded audio
+  POST /api/report/pdf   — Export screening results as a PDF report
 """
 
 import sys
@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from pydub import AudioSegment
 
@@ -21,6 +22,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from agents.graph import build_graph
+from app.pdf_report import generate_report_pdf
 
 # =====================================================================
 # App setup
@@ -124,3 +126,33 @@ async def screen(
         )
     finally:
         Path(temp_path).unlink(missing_ok=True)
+
+
+# =====================================================================
+# PDF export
+# =====================================================================
+
+
+class PdfExportRequest(BaseModel):
+    acoustic_result: Optional[float] = None
+    semantic_result: Optional[float] = None
+    fusion_result: Optional[float] = None
+    report: Optional[str] = None
+    subject_id: str = "anonymous"
+
+
+@app.post("/api/report/pdf")
+async def export_pdf(data: PdfExportRequest):
+    """Generate a PDF report from screening results."""
+    pdf_bytes = generate_report_pdf(
+        acoustic_result=data.acoustic_result,
+        semantic_result=data.semantic_result,
+        fusion_result=data.fusion_result,
+        report_text=data.report,
+        subject_id=data.subject_id,
+    )
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=nextcare-report.pdf"},
+    )

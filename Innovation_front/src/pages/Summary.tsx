@@ -1,4 +1,4 @@
-import {useState, type FC} from 'react';
+import {useState, useCallback, type FC} from 'react';
 import { motion } from 'motion/react';
 import Markdown from 'react-markdown';
 import {
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { exportPdf } from '../services/api';
 import type { ScreeningResult } from '../types';
 
 interface SummaryProps {
@@ -97,6 +98,21 @@ function extractSummaryParagraph(report: string | null): string {
 }
 
 export const Summary: FC<SummaryProps> = ({ results, onBackToHistory }) => {
+  const handleDownloadPdf = useCallback(async () => {
+    if (!results) return;
+    try {
+      const blob = await exportPdf(results);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nextcare-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('PDF download failed:', err);
+    }
+  }, [results]);
+
   if (!results) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-8">
@@ -218,6 +234,7 @@ export const Summary: FC<SummaryProps> = ({ results, onBackToHistory }) => {
             icon={Download}
             title="Download PDF"
             desc="Share with your doctor"
+            onClick={handleDownloadPdf}
           />
           <NextStepCard
             icon={UserPlus}
@@ -258,9 +275,9 @@ function FullReportSection({ report }: { report: string }) {
   );
 }
 
-function NextStepCard({ icon: Icon, title, desc }: { icon: any, title: string, desc: string }) {
+function NextStepCard({ icon: Icon, title, desc, onClick }: { icon: any, title: string, desc: string, onClick?: () => void }) {
   return (
-    <div className="bg-white border border-slate-100 rounded-[32px] p-8 flex flex-col gap-5 hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer group">
+    <div onClick={onClick} className="bg-white border border-slate-100 rounded-[32px] p-8 flex flex-col gap-5 hover:shadow-xl hover:shadow-slate-200/50 transition-all cursor-pointer group">
       <div className="w-12 h-12 bg-[#F1F5F9] rounded-2xl flex items-center justify-center text-[#3B82F6] group-hover:bg-[#3B82F6] group-hover:text-white transition-all duration-300">
         <Icon size={24} />
       </div>

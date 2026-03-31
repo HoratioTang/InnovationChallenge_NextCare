@@ -25,3 +25,26 @@ export async function runScreening(
 
   return res.json();
 }
+
+export async function exportPdf(
+  results: ScreeningResult,
+  subjectId: string = "anonymous",
+): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/api/report/pdf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      acoustic_result: results.acoustic_result,
+      semantic_result: results.semantic_result,
+      fusion_result: results.fusion_result,
+      report: results.report,
+      subject_id: subjectId,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error("PDF export failed");
+  }
+
+  return res.blob();
+}
