@@ -575,6 +575,7 @@ def feature_calc_agent(state: AgentState) -> dict:
         review_flag = ' [NEEDS SPEAKER REVIEW]' if speaker_info['needs_review'] else ''
         return {
             "linguistic_features": features,
+            "detected_language": lang,
             "messages": [
                 f"[feature_calc_agent] Extracted {len(features)} features "
                 f"({n_words} words, lang={lang}){review_flag}"
@@ -584,5 +585,6 @@ def feature_calc_agent(state: AgentState) -> dict:
     except Exception as e:
         return {
             "linguistic_features": _empty_features(),
+            "detected_language": None,
             "messages": [f"[feature_calc_agent] Exception: {e}"],
         }

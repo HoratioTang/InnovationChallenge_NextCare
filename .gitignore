@@ -20,6 +20,9 @@ __pycache__/
 Thumbs.db
 .DS_Store
 
+# Runtime data
+screening_history.json
+
 /example_output_from_meralion
 /tests
 API_DOCUMENT.md

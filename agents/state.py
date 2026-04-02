@@ -42,6 +42,7 @@ class AgentState(BaseModel):
     meralion_cognitive_insights: str = ""
 
     # ---- Feature Calculation Agent output ----
+    detected_language: Optional[str] = None               # Language detected from transcript ('en' or 'zh')
     linguistic_features: Optional[dict[str, Any]] = None  # e.g. word count, sentiment scores, etc.
 
     # ---- Semantic Classifier Agent output ----

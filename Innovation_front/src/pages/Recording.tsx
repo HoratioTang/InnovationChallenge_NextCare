@@ -31,9 +31,11 @@ const CONVERSATION_PROMPTS = [
 interface RecordingProps {
   onProceed: () => void;
   onFileSelected: (file: File) => void;
+  subjectId: string;
+  onSubjectIdChange: (id: string) => void;
 }
 
-export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => {
+export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected, subjectId, onSubjectIdChange }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
@@ -342,21 +344,38 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
               </div>
 
               <h2 className="text-2xl font-bold text-slate-800 mb-2">Ready to Record</h2>
-              <p className="text-slate-500 text-sm leading-relaxed mb-10 px-4">
+              <p className="text-slate-500 text-sm leading-relaxed mb-6 px-4">
                 Please find a quiet place and speak naturally into your microphone when ready.
               </p>
+
+              {/* Subject ID input */}
+              <div className="w-full mb-6 px-4">
+                <label htmlFor="subject-id" className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  Who is being screened?
+                </label>
+                <input
+                  id="subject-id"
+                  type="text"
+                  value={subjectId}
+                  onChange={(e) => onSubjectIdChange(e.target.value)}
+                  placeholder="Enter name or ID"
+                  className="w-full px-4 py-3 text-sm text-slate-800 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder:text-slate-300 transition-shadow"
+                />
+              </div>
 
               <div className="flex flex-col gap-3 w-full">
                 <Button
                   onClick={handleToggleRecording}
-                  variant="primary"
+                  variant={subjectId.trim() ? 'primary' : 'disabled'}
+                  disabled={!subjectId.trim()}
                   fullWidth
                   icon={<Play size={20} fill="currentColor" />}
                 >
                   Start Recording
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant={subjectId.trim() ? 'secondary' : 'disabled'}
+                  disabled={!subjectId.trim()}
                   fullWidth
                   icon={<Upload size={18} />}
                   onClick={triggerFileUpload}

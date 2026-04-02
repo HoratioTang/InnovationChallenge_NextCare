@@ -22,6 +22,7 @@ interface ProcessingProps {
   audioFile: File | null;
   results: ScreeningResult | null;
   setResults: (r: ScreeningResult) => void;
+  subjectId: string;
   onComplete: () => void;
   onCancel: () => void;
   onShowSummary: () => void;
@@ -44,6 +45,7 @@ export const Processing: FC<ProcessingProps> = ({
   audioFile,
   results,
   setResults,
+  subjectId,
   onComplete,
   onCancel,
   onShowSummary,
@@ -51,7 +53,7 @@ export const Processing: FC<ProcessingProps> = ({
   const handleDownload = async () => {
     if (!results) return;
     try {
-      const blob = await exportPdf(results);
+      const blob = await exportPdf(results, subjectId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -97,7 +99,7 @@ export const Processing: FC<ProcessingProps> = ({
     if (!audioFile || apiCalled.current) return;
     apiCalled.current = true;
 
-    runScreening(audioFile)
+    runScreening(audioFile, subjectId)
       .then((data) => {
         setResults(data);
         setProgress(100);

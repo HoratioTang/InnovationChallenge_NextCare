@@ -1,16 +1,24 @@
 """NextCare — FastAPI backend for the React frontend.
 
 Endpoints:
-  POST /api/screen       — Run screening pipeline on uploaded audio
-  POST /api/report/pdf   — Export screening results as a PDF report
+  POST /api/screen                              — Run screening pipeline on uploaded audio
+  POST /api/report/pdf                          — Export screening results as a PDF report
+  GET  /api/subjects                            — List all subjects
+  GET  /api/subjects/{id}/history               — Score timeline for a subject
+  GET  /api/subjects/{id}/sessions/{sid}        — Full session detail
+  GET  /api/subjects/{id}/feature-trends        — Feature time series
+  GET  /api/subjects/{id}/baselines             — Baseline stats
+  GET  /api/subjects/{id}/change-summary        — Change flags vs baseline
+  DELETE /api/subjects/{id}                     — Remove a subject
 """
 
+import logging
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -23,6 +31,9 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from agents.graph import build_graph
 from app.pdf_report import generate_report_pdf
+from config import MEMORY_BACKEND, MEMORY_LOCAL_PATH
+
+logger = logging.getLogger(__name__)
 
 # =====================================================================
 # App setup
@@ -39,6 +50,13 @@ app.add_middleware(
 
 # Build pipeline once at module level (equivalent to Streamlit's @st.cache_resource)
 _pipeline = build_graph()
+
+# Initialize memory store
+if MEMORY_BACKEND == "local":
+    from app.memory_local import LocalMemoryStore
+    memory = LocalMemoryStore(MEMORY_LOCAL_PATH)
+else:
+    raise ValueError(f"Unknown MEMORY_BACKEND: {MEMORY_BACKEND}")
 
 # =====================================================================
 # Audio conversion
@@ -79,6 +97,8 @@ class ScreeningResponse(BaseModel):
     meralion_acoustic_analysis: str = ""
     meralion_cognitive_insights: str = ""
     linguistic_features: Optional[dict[str, Any]] = None
+    session_id: Optional[str] = None
+    change_flags: list[dict] = []
 
 
 # =====================================================================
@@ -111,6 +131,25 @@ async def screen(
             "file_name": audio.filename or "upload.wav",
         })
 
+        # Extract audio metadata before numpy arrays are discarded
+        chunk_count = len(result.get("audio_chunks", []))
+        audio_metadata = {
+            "language": result.get("detected_language"),
+            "duration_sec": chunk_count * 2.0,
+            "chunk_count": chunk_count,
+        }
+
+        # Persist to memory (failures must not break screening)
+        session_id = None
+        change_flags: list[dict] = []
+        try:
+            session_id = memory.save_session(
+                subject_id, result, audio_metadata=audio_metadata,
+            )
+            change_flags = memory.get_change_flags(subject_id)
+        except Exception:
+            logger.exception("Memory save failed for subject %s", subject_id)
+
         # Return only JSON-serializable fields (exclude numpy arrays)
         return ScreeningResponse(
             acoustic_result=result.get("acoustic_result"),
@@ -123,6 +162,8 @@ async def screen(
             meralion_acoustic_analysis=result.get("meralion_acoustic_analysis", ""),
             meralion_cognitive_insights=result.get("meralion_cognitive_insights", ""),
             linguistic_features=result.get("linguistic_features"),
+            session_id=session_id,
+            change_flags=change_flags,
         )
     finally:
         Path(temp_path).unlink(missing_ok=True)
@@ -156,3 +197,61 @@ async def export_pdf(data: PdfExportRequest):
         media_type="application/pdf",
         headers={"Content-Disposition": "attachment; filename=nextcare-report.pdf"},
     )
+
+
+# =====================================================================
+# Memory / longitudinal tracking endpoints
+# =====================================================================
+
+
+@app.get("/api/subjects")
+async def get_subjects():
+    """List all subjects with session counts."""
+    return memory.list_subjects()
+
+
+@app.get("/api/subjects/{subject_id}/history")
+async def get_history(subject_id: str):
+    """Get all sessions for a subject, chronologically."""
+    return memory.get_history(subject_id)
+
+
+@app.get("/api/subjects/{subject_id}/sessions/{session_id}")
+async def get_session(subject_id: str, session_id: str):
+    """Get full details for a specific session."""
+    session = memory.get_session(subject_id, session_id)
+    if session is None:
+        return {"error": "Session not found"}
+    return session
+
+
+@app.get("/api/subjects/{subject_id}/feature-trends")
+async def get_feature_trends(
+    subject_id: str,
+    features: str = Query(..., description="Comma-separated feature names"),
+):
+    """Get time-series data for specific features."""
+    feature_list = [f.strip() for f in features.split(",")]
+    return memory.get_feature_trends(subject_id, feature_list)
+
+
+@app.get("/api/subjects/{subject_id}/baselines")
+async def get_baselines(subject_id: str):
+    """Get current baseline statistics for all features."""
+    return memory.get_baselines(subject_id)
+
+
+@app.get("/api/subjects/{subject_id}/change-summary")
+async def get_change_summary(subject_id: str):
+    """Get change flags comparing latest session to baseline."""
+    return {
+        "subject_id": subject_id,
+        "flags": memory.get_change_flags(subject_id),
+    }
+
+
+@app.delete("/api/subjects/{subject_id}")
+async def delete_subject(subject_id: str):
+    """Remove a subject and all their data."""
+    memory.delete_subject(subject_id)
+    return {"status": "deleted", "subject_id": subject_id}

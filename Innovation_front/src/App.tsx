@@ -17,10 +17,12 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('recording');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [results, setResults] = useState<ScreeningResult | null>(null);
+  const [subjectId, setSubjectId] = useState<string>('');
 
   const handleBackToRecording = () => {
     setAudioFile(null);
     setResults(null);
+    setSubjectId('');
     setCurrentPage('recording');
   };
 
@@ -31,6 +33,8 @@ export default function App() {
           <Recording
             onProceed={() => setCurrentPage('processing')}
             onFileSelected={setAudioFile}
+            subjectId={subjectId}
+            onSubjectIdChange={setSubjectId}
           />
         );
       case 'processing':
@@ -39,6 +43,7 @@ export default function App() {
             audioFile={audioFile}
             results={results}
             setResults={setResults}
+            subjectId={subjectId}
             onComplete={() => setCurrentPage('dashboard')}
             onCancel={handleBackToRecording}
             onShowSummary={() => setCurrentPage('summary')}
@@ -48,6 +53,7 @@ export default function App() {
         return (
           <Summary
             results={results}
+            subjectId={subjectId}
             onBackToHistory={() => setCurrentPage('dashboard')}
           />
         );
@@ -58,6 +64,8 @@ export default function App() {
           <Recording
             onProceed={() => setCurrentPage('processing')}
             onFileSelected={setAudioFile}
+            subjectId={subjectId}
+            onSubjectIdChange={setSubjectId}
           />
         );
     }

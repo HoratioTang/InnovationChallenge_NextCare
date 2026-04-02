@@ -22,6 +22,7 @@ import type { ScreeningResult } from '../types';
 
 interface SummaryProps {
   results: ScreeningResult | null;
+  subjectId: string;
   onBackToHistory: () => void;
 }
 
@@ -97,11 +98,11 @@ function extractSummaryParagraph(report: string | null): string {
   return report.slice(0, 500);
 }
 
-export const Summary: FC<SummaryProps> = ({ results, onBackToHistory }) => {
+export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory }) => {
   const handleDownloadPdf = useCallback(async () => {
     if (!results) return;
     try {
-      const blob = await exportPdf(results);
+      const blob = await exportPdf(results, subjectId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

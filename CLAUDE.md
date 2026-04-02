@@ -12,8 +12,10 @@ Target context: Singapore — supports English, Mandarin, and Singlish.
 Code/
 ├── app/                            # Application layer
 │   ├── streamlit_app.py            # Streamlit UI (2-tab: upload + report)
-│   ├── api.py                      # FastAPI REST backend (/api/screen, /api/report/pdf)
-│   └── pdf_report.py               # PDF export generator (fpdf2)
+│   ├── api.py                      # FastAPI REST backend (/api/screen, /api/report/pdf, memory endpoints)
+│   ├── pdf_report.py               # PDF export generator (fpdf2)
+│   ├── memory_base.py              # MemoryStore Protocol (shared interface contract)
+│   └── memory_local.py             # LocalMemoryStore (JSON file backend)
 ├── agents/                         # LangGraph agent nodes (one function per file)
 │   ├── state.py                    # Shared AgentState Pydantic BaseModel
 │   ├── graph.py                    # Main LangGraph graph wiring all agents
@@ -368,6 +370,47 @@ Generates PDF reports using `fpdf2`: header, assessment summary table with risk 
 - Reports must never give a diagnosis — screening tool only, always include disclaimer
 - `np.ndarray` fields in `AgentState` require `arbitrary_types_allowed = True` in Pydantic Config
 - `messages` and `errors` fields must use `Annotated[list[str], operator.add]` reducers for parallel fan-out compatibility
+
+## Memory System (Longitudinal Tracking)
+
+### Architecture
+- MemoryStore protocol (`app/memory_base.py`) defines the contract for all backends
+- `app/memory_local.py` — LocalMemoryStore: JSON file, zero dependencies, for local dev/demo
+- Switched via `MEMORY_BACKEND` env var (currently only "local" supported)
+- Persistence happens in FastAPI layer (`app/api.py`), NOT in the LangGraph pipeline
+- The pipeline is pure single-session — it has no awareness of history
+- Memory save is wrapped in try/except so failures never break screening
+
+### Response Shape Contract
+All return shapes are defined in `memory_base.py`. Any future backend MUST match exactly.
+Frontend and API endpoints depend on these shapes — do not deviate.
+
+### Key Modules
+- `app/memory_base.py` — MemoryStore Protocol (the contract)
+- `app/memory_local.py` — LocalMemoryStore (JSON file backend)
+- `config.py` — `FEATURE_GROUPS`, `MEMORY_BACKEND`, `Z_THRESHOLD`, `MIN_SESSIONS_FOR_DETECTION`, `HIGHER_IS_WORSE`, `LOWER_IS_WORSE`
+
+### Change Detection
+- Welford's online algorithm for incremental baseline mean/std
+- Z-score based flagging with direction awareness (`HIGHER_IS_WORSE` / `LOWER_IS_WORSE`)
+- Minimum 3 sessions before flagging (`MIN_SESSIONS_FOR_DETECTION`)
+- 1.5 std threshold (`Z_THRESHOLD`), "significant" at 2.0
+
+### Dashboard Endpoints
+- `GET /api/subjects` — list all subjects
+- `GET /api/subjects/{id}/history` — score timeline data
+- `GET /api/subjects/{id}/sessions/{sid}` — full session detail
+- `GET /api/subjects/{id}/feature-trends?features=x,y` — feature time series
+- `GET /api/subjects/{id}/baselines` — current baseline stats
+- `GET /api/subjects/{id}/change-summary` — change flags vs baseline
+- `DELETE /api/subjects/{id}` — remove subject and all data
+
+### What NOT To Do (Memory)
+- Do not import memory modules inside `agents/` — memory is API-layer only
+- Do not change return shapes without updating the protocol in `memory_base.py`
+- Do not access the JSON file directly — always go through `LocalMemoryStore`
+
+---
 
 ## What NOT To Do
 - Do not compute mel-spectrograms manually for HeAR — use official `preprocess_audio`

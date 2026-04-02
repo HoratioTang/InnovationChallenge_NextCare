@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import torch
 
@@ -106,3 +107,47 @@ REPORT_LLM_MODEL = "gemini-2.5-flash"
 # --- Option B: Local Ollama (testing) ---
 # REPORT_LLM_PROVIDER = "ollama"
 # REPORT_LLM_MODEL = "qwen2.5:3b"
+
+# ============================================================
+# Memory System
+# ============================================================
+
+MEMORY_BACKEND = os.getenv("MEMORY_BACKEND", "local")  # "local" or "supabase"
+MEMORY_LOCAL_PATH = "screening_history.json"
+
+# Feature groups — used for change detection
+FEATURE_GROUPS = {
+    "lexical": [
+        "pronoun_to_noun_ratio", "content_word_density",
+        "noun_ratio", "verb_ratio", "pronoun_ratio", "adjective_ratio",
+    ],
+    "diversity": ["mattr", "mtld", "unique_words", "ttr_raw"],
+    "frequency": ["mean_zipf_frequency", "low_freq_ratio", "high_freq_ratio"],
+    "utterance": ["mlu", "sentence_count", "sentence_length_std", "total_word_count"],
+    "filler": [
+        "um_rate", "uh_rate", "filled_pause_rate",
+        "um_to_uh_ratio", "discourse_filler_rate", "empty_speech_rate",
+    ],
+    "syntactic": ["mean_dependency_distance", "max_dependency_distance", "idea_density_proxy"],
+    "coherence": [
+        "semantic_coherence_mean", "semantic_coherence_std",
+        "semantic_coherence_min", "repetitiveness", "topic_drift",
+    ],
+}
+
+# Change detection thresholds
+MIN_SESSIONS_FOR_DETECTION = 3   # No flags until this many sessions exist
+Z_THRESHOLD = 1.5                # Std devs from baseline to trigger a flag
+
+# Direction mappings for change detection
+HIGHER_IS_WORSE = {
+    "pronoun_to_noun_ratio", "um_rate", "uh_rate", "filled_pause_rate",
+    "discourse_filler_rate", "empty_speech_rate", "repetitiveness",
+    "topic_drift", "semantic_coherence_std",
+}
+
+LOWER_IS_WORSE = {
+    "mattr", "mtld", "unique_words", "ttr_raw", "content_word_density",
+    "mlu", "mean_zipf_frequency", "idea_density_proxy",
+    "semantic_coherence_mean", "semantic_coherence_min",
+}
