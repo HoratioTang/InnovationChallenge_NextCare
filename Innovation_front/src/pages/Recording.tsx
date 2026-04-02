@@ -1,19 +1,32 @@
 import { useState, useEffect, useRef, type FC, type ChangeEvent } from 'react';
-import { 
-  Mic, 
-  Play, 
-  Shield, 
-  Volume2, 
-  Timer, 
+import {
+  Mic,
+  Play,
+  Shield,
+  Volume2,
+  Timer,
   Lock,
   Square,
   CheckCircle2,
   ArrowRight,
-  Upload
+  Upload,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '../components/ui/Button';
 import { Card, CardHeader, CardFooter } from '../components/ui/Card';
+
+const CONVERSATION_PROMPTS = [
+  "Describe your typical morning routine in detail.",
+  "Tell me about a favourite meal you enjoy cooking or eating.",
+  "Describe what you can see from your window right now.",
+  "Talk about a happy memory from a recent family gathering.",
+  "Describe the neighbourhood you live in.",
+  "Tell me about what you did yesterday from start to finish.",
+  "Describe your favourite place to visit and why you enjoy it.",
+  "Talk about a hobby or activity you enjoy doing.",
+  "Describe how you would make a cup of tea or coffee.",
+  "Tell me about a trip or outing you remember well.",
+];
 
 interface RecordingProps {
   onProceed: () => void;
@@ -25,11 +38,16 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
   const [seconds, setSeconds] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [currentPrompt, setCurrentPrompt] = useState<string>("");
+  const [audioLevels, setAudioLevels] = useState<number[]>(new Array(20).fill(0));
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isRecording) {
@@ -44,10 +62,12 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
     };
   }, [isRecording]);
 
-  // Clean up media stream on unmount
+  // Clean up media stream and audio context on unmount
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop());
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      audioContextRef.current?.close();
     };
   }, []);
 
@@ -59,7 +79,13 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
 
   const handleToggleRecording = async () => {
     if (isRecording) {
-      // Stop recording
+      // Stop recording — clean up audio visualizer
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      audioContextRef.current?.close();
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      setAudioLevels(new Array(20).fill(0));
+
       mediaRecorderRef.current?.stop();
       streamRef.current?.getTracks().forEach(t => t.stop());
       setIsRecording(false);
@@ -89,6 +115,29 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
         };
 
         recorder.start();
+
+        // Pick a random conversation prompt
+        const randomPrompt = CONVERSATION_PROMPTS[Math.floor(Math.random() * CONVERSATION_PROMPTS.length)];
+        setCurrentPrompt(randomPrompt);
+
+        // Set up live audio waveform visualizer
+        const audioCtx = new AudioContext();
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+        audioContextRef.current = audioCtx;
+        analyserRef.current = analyser;
+
+        const updateLevels = () => {
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(data);
+          const levels = Array.from(data.slice(0, 20)).map(v => v / 255);
+          setAudioLevels(levels);
+          animationFrameRef.current = requestAnimationFrame(updateLevels);
+        };
+        updateLevels();
+
         setIsRecording(true);
       } catch {
         setMicError('Microphone access denied. Please allow mic permission or upload a file instead.');
@@ -145,93 +194,175 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
       {/* Assessment Card */}
       <Card className="max-w-md">
         <CardHeader>
-          <div className="relative mb-6">
-            <motion.div 
-              animate={isRecording ? { scale: [1, 1.15, 1] } : {}}
-              transition={{ repeat: Infinity, duration: 2 }}
-              className={`w-24 h-24 rounded-full flex items-center justify-center transition-colors duration-500 ${
-                isFinished ? 'bg-emerald-50' : isRecording ? (isOverOneMinute ? 'bg-emerald-50' : 'bg-red-50') : 'bg-blue-50'
-              }`}
-            >
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center shadow-inner transition-colors duration-500 ${
-                isFinished ? 'bg-emerald-500' : isRecording ? (isOverOneMinute ? 'bg-emerald-500' : 'bg-red-500') : 'bg-blue-600'
-              }`}>
-                {isFinished ? (
-                  <CheckCircle2 className="text-white" size={32} />
-                ) : (
-                  <Mic className="text-white" size={32} />
-                )}
-              </div>
-            </motion.div>
-            {isRecording && (
-              <motion.div 
+          {/* Hidden file input — always present */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept="audio/*"
+            className="hidden"
+          />
+
+          {isRecording ? (
+            /* ===== RECORDING STATE ===== */
+            <div className="flex flex-col items-center w-full">
+              {/* Live Recording badge */}
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className={`absolute -inset-4 border-2 rounded-full animate-ping ${isOverOneMinute ? 'border-emerald-200' : 'border-red-200'}`}
-              />
-            )}
-          </div>
+                className="flex items-center gap-2 mb-6"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-wider text-red-500">Live Recording</span>
+              </motion.div>
 
-          {/* Timer Display */}
-          {(isRecording || isFinished) && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`text-3xl font-mono font-bold mb-4 ${isOverOneMinute ? 'text-emerald-600' : 'text-slate-800'}`}
-            >
-              {formatTime(seconds)}
-            </motion.div>
-          )}
+              {/* Heading */}
+              <h2 className="text-2xl font-bold text-slate-800 mb-4">Recording...</h2>
 
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">
-            {isFinished ? 'Recording is complete' : isRecording ? 'Recording...' : 'Ready to Record'}
-          </h2>
-          <p className="text-slate-500 text-sm leading-relaxed mb-10 px-4">
-            {isFinished 
-              ? 'Your voice assessment has been successfully captured. You can now proceed.' 
-              : 'Please find a quiet place and speak naturally into your microphone when ready.'}
-          </p>
+              {/* Conversation prompt */}
+              <motion.p
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-slate-600 text-sm italic leading-relaxed mb-6 px-4"
+              >
+                "{currentPrompt}"
+              </motion.p>
 
-          <div className="flex flex-col gap-4 w-full">
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              onChange={handleFileChange} 
-              accept="audio/*" 
-              className="hidden" 
-            />
-            {!isFinished ? (
-              <div className="flex flex-col gap-3">
-                <Button 
+              {/* Live waveform visualizer */}
+              <div className="flex items-end justify-center gap-1 h-24 w-full p-4 border border-slate-200 rounded-xl bg-white mb-6">
+                {audioLevels.map((level, i) => (
+                  <div
+                    key={i}
+                    className="w-2 rounded-full bg-blue-400 transition-all duration-75"
+                    style={{ height: `${Math.max(8, level * 100)}%` }}
+                  />
+                ))}
+              </div>
+
+              {/* Instruction text */}
+              <p className="text-slate-500 text-sm leading-relaxed mb-8 px-4">
+                Speak naturally and take your time. Try to speak for at least 60 seconds.
+              </p>
+
+              {/* Stop button */}
+              <div className="flex flex-col items-center mb-8">
+                <button
                   onClick={handleToggleRecording}
-                  disabled={isRecording && !isOverOneMinute}
-                  variant={isRecording ? (isOverOneMinute ? 'success' : 'disabled') : 'primary'}
-                  fullWidth
-                  icon={isRecording ? (isOverOneMinute ? <Square size={20} fill="currentColor" /> : <Lock size={20} />) : <Play size={20} fill="currentColor" />}
+                  disabled={!isOverOneMinute}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center transition-opacity ${
+                    isOverOneMinute ? 'bg-slate-800 opacity-100 cursor-pointer' : 'bg-slate-800 opacity-30 cursor-not-allowed'
+                  }`}
                 >
-                  {isRecording ? (isOverOneMinute ? 'Stop Recording' : `Recording... (${60 - seconds}s left)`) : 'Start Recording'}
-                </Button>
+                  <Square size={20} className="text-white" fill="white" />
+                </button>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-800 mt-3">
+                  Tap to Stop
+                </p>
+              </div>
 
-                {!isRecording && (
-                  <Button 
-                    variant="secondary" 
-                    fullWidth 
-                    icon={<Upload size={18} />}
-                    onClick={triggerFileUpload}
-                  >
-                    Upload Recording
-                  </Button>
-                )}
-                
-                {isRecording && !isOverOneMinute && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-[10px] font-bold text-slate-400 uppercase tracking-wider"
-                  >
-                    Minimum 60 seconds required
-                  </motion.p>
-                )}
+              {/* Progress bar */}
+              <div className="w-full">
+                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-1000"
+                    style={{ width: `${Math.min((seconds / 60) * 100, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-slate-400">
+                  <span>{formatTime(seconds)}</span>
+                  <span>Min. 1:00 recommended</span>
+                </div>
+              </div>
+
+              {/* Mic error */}
+              {micError && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-xs font-medium text-red-500 px-4 mt-4"
+                >
+                  {micError}
+                </motion.p>
+              )}
+            </div>
+          ) : isFinished ? (
+            /* ===== FINISHED STATE (unchanged) ===== */
+            <>
+              <div className="relative mb-6">
+                <div className="w-24 h-24 rounded-full flex items-center justify-center bg-emerald-50">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-inner bg-emerald-500">
+                    <CheckCircle2 className="text-white" size={32} />
+                  </div>
+                </div>
+              </div>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-3xl font-mono font-bold mb-4 text-emerald-600"
+              >
+                {formatTime(seconds)}
+              </motion.div>
+
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">Recording is complete</h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-10 px-4">
+                Your voice assessment has been successfully captured. You can now proceed.
+              </p>
+
+              <div className="flex flex-col gap-3 w-full">
+                <Button
+                  variant="primary"
+                  fullWidth
+                  onClick={onProceed}
+                  icon={<ArrowRight size={20} />}
+                  className="flex-row-reverse"
+                >
+                  Proceed to the next step
+                </Button>
+                <button
+                  onClick={() => {
+                    setIsFinished(false);
+                    setSeconds(0);
+                  }}
+                  className="text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Redo Recording
+                </button>
+              </div>
+            </>
+          ) : (
+            /* ===== PRE-RECORDING STATE (unchanged) ===== */
+            <>
+              <div className="relative mb-6">
+                <div className="w-24 h-24 rounded-full flex items-center justify-center bg-blue-50">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-inner bg-blue-600">
+                    <Mic className="text-white" size={32} />
+                  </div>
+                </div>
+              </div>
+
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">Ready to Record</h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-10 px-4">
+                Please find a quiet place and speak naturally into your microphone when ready.
+              </p>
+
+              <div className="flex flex-col gap-3 w-full">
+                <Button
+                  onClick={handleToggleRecording}
+                  variant="primary"
+                  fullWidth
+                  icon={<Play size={20} fill="currentColor" />}
+                >
+                  Start Recording
+                </Button>
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  icon={<Upload size={18} />}
+                  onClick={triggerFileUpload}
+                >
+                  Upload Recording
+                </Button>
                 {micError && (
                   <motion.p
                     initial={{ opacity: 0 }}
@@ -242,29 +373,8 @@ export const Recording: FC<RecordingProps> = ({ onProceed, onFileSelected }) => 
                   </motion.p>
                 )}
               </div>
-            ) : (
-              <div className="flex flex-col gap-3 w-full">
-                <Button 
-                  variant="primary"
-                  fullWidth
-                  onClick={onProceed}
-                  icon={<ArrowRight size={20} />}
-                  className="flex-row-reverse"
-                >
-                  Proceed to the next step
-                </Button>
-                <button 
-                  onClick={() => {
-                    setIsFinished(false);
-                    setSeconds(0);
-                  }}
-                  className="text-sm font-medium text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  Redo Recording
-                </button>
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </CardHeader>
 
         <CardFooter>
