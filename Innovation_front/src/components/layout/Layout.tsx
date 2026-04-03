@@ -5,9 +5,10 @@ import { Sidebar } from './Sidebar';
 interface LayoutProps {
   children: ReactNode;
   onNavigate?: (page: string) => void;
+  currentPage?: string;
 }
 
-export const Layout: FC<LayoutProps> = ({ children, onNavigate }) => {
+export const Layout: FC<LayoutProps> = ({ children, onNavigate, currentPage }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   return (
@@ -18,6 +19,7 @@ export const Layout: FC<LayoutProps> = ({ children, onNavigate }) => {
           isOpen={isSidebarOpen}
           onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
           onNavigate={onNavigate}
+          currentPage={currentPage}
         />
         <main className="flex-1 flex flex-col relative overflow-y-auto">
           {children}

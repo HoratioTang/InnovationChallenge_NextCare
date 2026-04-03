@@ -121,17 +121,17 @@ FEATURE_GROUPS = {
         "pronoun_to_noun_ratio", "content_word_density",
         "noun_ratio", "verb_ratio", "pronoun_ratio", "adjective_ratio",
     ],
-    "diversity": ["mattr", "mtld", "unique_words", "ttr_raw"],
-    "frequency": ["mean_zipf_frequency", "low_freq_ratio", "high_freq_ratio"],
+    "diversity": ["mattr", "mtld", "n_unique_words", "ttr_raw"],
+    "frequency": ["mean_word_frequency", "low_freq_word_ratio", "high_freq_word_ratio"],
     "utterance": ["mlu", "sentence_count", "sentence_length_std", "total_word_count"],
     "filler": [
-        "um_rate", "uh_rate", "filled_pause_rate",
+        "filler_um_rate", "filler_uh_rate", "filler_total_rate",
         "um_to_uh_ratio", "discourse_filler_rate", "empty_speech_rate",
     ],
     "syntactic": ["mean_dependency_distance", "max_dependency_distance", "idea_density_proxy"],
     "coherence": [
         "semantic_coherence_mean", "semantic_coherence_std",
-        "semantic_coherence_min", "repetitiveness", "topic_drift",
+        "semantic_coherence_min", "repetitiveness_score", "topic_drift",
     ],
 }
 
@@ -141,13 +141,13 @@ Z_THRESHOLD = 1.5                # Std devs from baseline to trigger a flag
 
 # Direction mappings for change detection
 HIGHER_IS_WORSE = {
-    "pronoun_to_noun_ratio", "um_rate", "uh_rate", "filled_pause_rate",
-    "discourse_filler_rate", "empty_speech_rate", "repetitiveness",
+    "pronoun_to_noun_ratio", "filler_um_rate", "filler_uh_rate", "filler_total_rate",
+    "discourse_filler_rate", "empty_speech_rate", "repetitiveness_score",
     "topic_drift", "semantic_coherence_std",
 }
 
 LOWER_IS_WORSE = {
-    "mattr", "mtld", "unique_words", "ttr_raw", "content_word_density",
-    "mlu", "mean_zipf_frequency", "idea_density_proxy",
+    "mattr", "mtld", "n_unique_words", "ttr_raw", "content_word_density",
+    "mlu", "mean_word_frequency", "idea_density_proxy",
     "semantic_coherence_mean", "semantic_coherence_min",
 }

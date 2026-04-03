@@ -7,17 +7,19 @@ import { useState } from 'react';
 import { Layout } from './components/layout/Layout';
 import { Recording } from './pages/Recording';
 import { Processing } from './pages/Processing';
-import { Dashboard } from './pages/Dashboard';
+import { History } from './pages/History';
+import { SubjectDashboard } from './pages/SubjectDashboard';
 import { Summary } from './pages/Summary';
 import type { ScreeningResult } from './types';
 
-type Page = 'recording' | 'processing' | 'dashboard' | 'summary';
+type Page = 'recording' | 'processing' | 'history' | 'subjectDashboard' | 'summary';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('recording');
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [results, setResults] = useState<ScreeningResult | null>(null);
   const [subjectId, setSubjectId] = useState<string>('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
 
   const handleBackToRecording = () => {
     setAudioFile(null);
@@ -44,7 +46,7 @@ export default function App() {
             results={results}
             setResults={setResults}
             subjectId={subjectId}
-            onComplete={() => setCurrentPage('dashboard')}
+            onComplete={() => setCurrentPage('history')}
             onCancel={handleBackToRecording}
             onShowSummary={() => setCurrentPage('summary')}
           />
@@ -54,11 +56,25 @@ export default function App() {
           <Summary
             results={results}
             subjectId={subjectId}
-            onBackToHistory={() => setCurrentPage('dashboard')}
+            onBackToHistory={() => setCurrentPage('history')}
           />
         );
-      case 'dashboard':
-        return <Dashboard />;
+      case 'history':
+        return (
+          <History
+            onSelectSubject={(id) => {
+              setSelectedSubjectId(id);
+              setCurrentPage('subjectDashboard');
+            }}
+          />
+        );
+      case 'subjectDashboard':
+        return (
+          <SubjectDashboard
+            subjectId={selectedSubjectId}
+            onBack={() => setCurrentPage('history')}
+          />
+        );
       default:
         return (
           <Recording
@@ -72,7 +88,7 @@ export default function App() {
   };
 
   return (
-    <Layout onNavigate={(page) => setCurrentPage(page as Page)}>
+    <Layout onNavigate={(page) => setCurrentPage(page as Page)} currentPage={currentPage}>
       {renderPage()}
     </Layout>
   );

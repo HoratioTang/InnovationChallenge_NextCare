@@ -13,14 +13,18 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   onNavigate?: (page: string) => void;
+  currentPage?: string;
 }
 
-export const Sidebar: FC<SidebarProps> = ({ isOpen, onToggle, onNavigate }) => {
+const SCREENING_PAGES = new Set(['recording', 'processing', 'summary']);
+const HISTORY_PAGES = new Set(['history', 'subjectDashboard']);
+
+export const Sidebar: FC<SidebarProps> = ({ isOpen, onToggle, onNavigate, currentPage = '' }) => {
   const sidebarItems = [
-    { icon: LayoutGrid, label: 'Dashboard', active: true, page: 'recording' },
-    { icon: History, label: 'History', active: false, page: '' },
-    { icon: Users, label: 'Patients', active: false, page: '' },
-    { icon: Settings, label: 'Settings', active: false, page: '' },
+    { icon: LayoutGrid, label: 'Screening', page: 'recording', isActive: SCREENING_PAGES.has(currentPage) },
+    { icon: History, label: 'History', page: 'history', isActive: HISTORY_PAGES.has(currentPage) },
+    { icon: Users, label: 'Patients', page: '', isActive: false },
+    { icon: Settings, label: 'Settings', page: '', isActive: false },
   ];
 
   return (
@@ -35,7 +39,7 @@ export const Sidebar: FC<SidebarProps> = ({ isOpen, onToggle, onNavigate }) => {
             key={idx}
             onClick={() => item.page && onNavigate?.(item.page)}
             className={`flex items-center gap-4 p-3 rounded-xl transition-all duration-200 w-full ${
-              item.active
+              item.isActive
                 ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                 : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'
             }`}

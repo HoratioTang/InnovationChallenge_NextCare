@@ -43,6 +43,21 @@ Code/
 │   └── semantic_metadata.json      # Feature names/order for semantic classifier
 ├── hear/                           # Google HeAR repo (cloned, provides preprocess_audio)
 ├── Innovation_front/               # React frontend (npm project, talks to FastAPI)
+│   └── src/
+│       ├── pages/
+│       │   ├── Recording.tsx       # Audio recording + upload with waveform visualizer
+│       │   ├── Processing.tsx      # Pipeline execution progress
+│       │   ├── Summary.tsx         # Screening results with score cards + report
+│       │   ├── History.tsx         # Subject list page (memory-backed)
+│       │   └── SubjectDashboard.tsx # Per-subject longitudinal dashboard
+│       ├── components/dashboard/
+│       │   ├── ScoreTimeline.tsx    # Recharts line chart (fused/acoustic/semantic over time)
+│       │   ├── ChangeAlerts.tsx     # Z-score change flag cards
+│       │   ├── FeatureExplorer.tsx  # Feature group selector + trend chart
+│       │   ├── SessionLog.tsx       # Expandable session table with full detail
+│       │   ├── ScoreBadge.tsx       # Color-coded score indicator
+│       │   └── SubjectCard.tsx      # Subject list card with scores + alerts
+│       └── services/api.ts         # All fetch functions (screen, PDF, memory endpoints)
 ├── docs/                           # Deployment & feature documentation
 │   ├── cloud_run_deployment.md
 │   ├── vertex_ai_hear_deployment.md
@@ -51,6 +66,7 @@ Code/
 │   ├── test_feature_calc.py
 │   ├── test_classifier_semantic.py
 │   ├── test_full_pipeline.py
+│   ├── test_pipeline_billcosby.py  # E2E pipeline test with Bill Cosby audio samples
 │   ├── test_graph_integration.py
 │   ├── test_report.py
 │   └── test_skill_store.py
@@ -134,6 +150,7 @@ class AgentState(BaseModel):
     meralion_cognitive_insights: str = ""
 
     # Written by feature_calc
+    detected_language: Optional[str] = None
     linguistic_features: Optional[dict[str, Any]] = None
 
     # Written by classifier_semantic
@@ -236,14 +253,16 @@ Uses the official Google HeAR preprocessing from the embedded `hear/` repo. Impo
 - Inf/NaN values replaced with 0.0; missing features default to 0.0
 
 ### Feature Extraction (31 features)
-Extracted by `agents/feature_calc.py` (~589 lines). Groups:
-- **Lexical (6):** pronoun_to_noun_ratio, content_word_density, noun/verb/pronoun/adjective ratios
-- **Lexical Diversity (4):** MATTR, MTLD, unique words, raw TTR
-- **Word Frequency (3):** mean Zipf frequency, low/high freq word ratios
-- **Utterance (4):** MLU, sentence count, sentence length std, total word count
-- **Fillers (6):** um/uh/total rates, um-to-uh ratio, discourse filler rate, empty speech rate
-- **Syntactic (3):** mean/max dependency distance, idea density proxy
-- **Coherence (5):** semantic coherence mean/std/min, repetitiveness, topic drift
+Extracted by `agents/feature_calc.py` (~589 lines). The canonical field names are defined in `_empty_features()` — all downstream code (config.py `FEATURE_GROUPS`, frontend components) must use these exact names.
+
+Groups and exact field names:
+- **Lexical (6):** `pronoun_to_noun_ratio`, `content_word_density`, `noun_ratio`, `verb_ratio`, `pronoun_ratio`, `adjective_ratio`
+- **Lexical Diversity (4):** `mattr`, `mtld`, `n_unique_words`, `ttr_raw`
+- **Word Frequency (3):** `mean_word_frequency`, `low_freq_word_ratio`, `high_freq_word_ratio`
+- **Utterance (4):** `mlu`, `sentence_count`, `sentence_length_std`, `total_word_count`
+- **Fillers (6):** `filler_um_rate`, `filler_uh_rate`, `filler_total_rate`, `um_to_uh_ratio`, `discourse_filler_rate`, `empty_speech_rate`
+- **Syntactic (3):** `mean_dependency_distance`, `max_dependency_distance`, `idea_density_proxy`
+- **Coherence (5):** `semantic_coherence_mean`, `semantic_coherence_std`, `semantic_coherence_min`, `repetitiveness_score`, `topic_drift`
 
 Language-aware: supports English (spacy `en_core_web_sm`) and Mandarin (spacy `zh_core_web_sm`).
 
@@ -308,6 +327,15 @@ REPORT_LLM_MODEL = "gemini-2.5-flash"
 
 # Language support, filler word lists, empty speech terms — see config.py for full details
 LANG_CONFIG = {'en': {...}, 'zh': {...}}
+
+# Memory system constants
+MEMORY_BACKEND = "local"              # "local" or "supabase"
+MEMORY_LOCAL_PATH = "screening_history.json"
+FEATURE_GROUPS = { ... }              # Grouped feature names — must match _empty_features() exactly
+MIN_SESSIONS_FOR_DETECTION = 3
+Z_THRESHOLD = 1.5
+HIGHER_IS_WORSE = { ... }            # Features where increase signals decline
+LOWER_IS_WORSE = { ... }             # Features where decrease signals decline
 ```
 
 ---
@@ -332,7 +360,19 @@ Running: `streamlit run app/streamlit_app.py --server.headless true`
 Running: `uvicorn app.api:app --reload`
 
 ### React Frontend (`Innovation_front/`)
-Separate React app that talks to the FastAPI backend.
+Separate React app that talks to the FastAPI backend. State-machine navigation (no react-router-dom).
+
+**Pages:**
+- **Recording** — Audio recording with Web Audio API waveform visualizer, conversation prompts, subject ID input, file upload support
+- **Processing** — Pipeline execution progress display
+- **Summary** — Score cards (Cognitive Stability / Speech Fluency) with labels, numeric scores, progress bars; collapsible full report; PDF download
+- **History** — Subject list with enriched cards (latest score, alert count, delete with confirmation)
+- **SubjectDashboard** — Per-subject longitudinal view: ScoreTimeline (Recharts), ChangeAlerts, FeatureExplorer (group selector + trend chart), SessionLog (expandable with full detail)
+
+**Key design decisions:**
+- Subject ID is entered by caregiver before recording — enables per-subject longitudinal tracking
+- Dashboard components fetch from memory API endpoints independently
+- Feature names in `FeatureExplorer.tsx` and `SessionLog.tsx` must match `_empty_features()` in `feature_calc.py`
 
 ### PDF Export (`app/pdf_report.py`)
 Generates PDF reports using `fpdf2`: header, assessment summary table with risk levels, detailed report text, disclaimer.
@@ -352,6 +392,7 @@ Generates PDF reports using `fpdf2`: header, assessment summary table with risk 
 - **ML**: scikit-learn — LogisticRegression(class_weight='balanced')
 - **Model Serialization**: `joblib` for sklearn pipelines, `save_pretrained` for HeAR
 - **State Management**: Pydantic BaseModel with `operator.add` reducers
+- **Charting**: Recharts (React, used in dashboard components)
 - **PDF**: fpdf2
 - **Language**: Python 3.10+
 
@@ -427,3 +468,4 @@ Frontend and API endpoints depend on these shapes — do not deviate.
 - Do not use `pickle` for sklearn pipelines — use `joblib`
 - Do not assume sklearn pipeline compatibility across versions — pin versions in `requirements.txt`
 - Do not use `list[str]` without `Annotated[..., operator.add]` for fields written by parallel branches — this causes `InvalidUpdateError`
+- Do not use feature names that differ from `_empty_features()` in `feature_calc.py` — the canonical source of truth for all 31 feature field names. `config.py` FEATURE_GROUPS, HIGHER_IS_WORSE, LOWER_IS_WORSE, and all frontend components must match exactly

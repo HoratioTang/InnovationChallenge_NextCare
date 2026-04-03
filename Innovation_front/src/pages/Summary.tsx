@@ -151,6 +151,9 @@ export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory 
                 <h3 className="text-3xl font-black tracking-tight" style={{ color: acoustic.textDark }}>
                   {acoustic.label}
                 </h3>
+                <p className="text-lg font-bold" style={{ color: `${acoustic.textMuted}cc` }}>
+                  Score: {results.acoustic_result?.toFixed(4) ?? '—'}
+                </p>
                 <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: acoustic.barBg }}>
                   <div
                     className="h-full rounded-full transition-all duration-700"
@@ -176,6 +179,9 @@ export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory 
                 <h3 className="text-3xl font-black tracking-tight" style={{ color: semantic.textDark }}>
                   {semantic.label}
                 </h3>
+                <p className="text-lg font-bold" style={{ color: `${semantic.textMuted}cc` }}>
+                  Score: {results.semantic_result?.toFixed(4) ?? '—'}
+                </p>
                 <div className="w-full h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: semantic.barBg }}>
                   <div
                     className="h-full rounded-full transition-all duration-700"
