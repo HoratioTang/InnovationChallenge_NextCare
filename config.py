@@ -109,6 +109,14 @@ REPORT_LLM_MODEL = "gemini-2.5-flash"
 # REPORT_LLM_MODEL = "qwen2.5:3b"
 
 # ============================================================
+# Dashboard Chatbot Settings
+# ============================================================
+
+CHAT_MAX_OUTPUT_TOKENS = 400     # Keep chat responses concise
+CHAT_HISTORY_TURNS = 10          # Max conversation turns sent to LLM
+CHAT_TRANSCRIPT_WORDS = 300      # Trim transcript to last N words in context
+
+# ============================================================
 # Memory System
 # ============================================================
 

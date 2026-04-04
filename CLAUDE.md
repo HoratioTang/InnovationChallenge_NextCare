@@ -12,7 +12,8 @@ Target context: Singapore — supports English, Mandarin, and Singlish.
 Code/
 ├── app/                            # Application layer
 │   ├── streamlit_app.py            # Streamlit UI (2-tab: upload + report)
-│   ├── api.py                      # FastAPI REST backend (/api/screen, /api/report/pdf, memory endpoints)
+│   ├── api.py                      # FastAPI REST backend (/api/screen, /api/report/pdf, memory endpoints, chat)
+│   ├── chat.py                     # Dashboard chatbot (context builder, system prompt, LLM handler)
 │   ├── pdf_report.py               # PDF export generator (fpdf2)
 │   ├── memory_base.py              # MemoryStore Protocol (shared interface contract)
 │   └── memory_local.py             # LocalMemoryStore (JSON file backend)
@@ -57,7 +58,13 @@ Code/
 │       │   ├── SessionLog.tsx       # Expandable session table with full detail
 │       │   ├── ScoreBadge.tsx       # Color-coded score indicator
 │       │   └── SubjectCard.tsx      # Subject list card with scores + alerts
-│       └── services/api.ts         # All fetch functions (screen, PDF, memory endpoints)
+│       ├── components/chat/
+│       │   ├── ChatContainer.tsx    # State owner — manages messages, mode, API calls
+│       │   ├── ChatPopup.tsx        # Floating bubble + popup card
+│       │   ├── ChatSidebar.tsx      # Right sidebar panel
+│       │   ├── ChatInput.tsx        # Shared text input + send button
+│       │   └── ChatMessageList.tsx  # Message list with react-markdown, typing indicator, starter prompts
+│       └── services/api.ts         # All fetch functions (screen, PDF, memory, chat endpoints)
 ├── docs/                           # Deployment & feature documentation
 │   ├── cloud_run_deployment.md
 │   ├── vertex_ai_hear_deployment.md
@@ -450,6 +457,44 @@ Frontend and API endpoints depend on these shapes — do not deviate.
 - Do not import memory modules inside `agents/` — memory is API-layer only
 - Do not change return shapes without updating the protocol in `memory_base.py`
 - Do not access the JSON file directly — always go through `LocalMemoryStore`
+
+---
+
+## Dashboard Chatbot
+
+### Architecture
+- Subject-scoped chatbot on the SubjectDashboard page — only discusses the current subject's screening data
+- Two display modes: floating bubble/popup (default) and right sidebar (expanded)
+- Backend: `POST /api/subjects/{id}/chat` — queries memory for context, sends to Gemini 2.5 Flash
+- Frontend: `ChatContainer.tsx` owns conversation state (messages, loading, mode), delegates rendering to `ChatPopup` or `ChatSidebar`
+- Chat history is client-side only — lost on page refresh, not persisted to memory store
+
+### Context Strategy
+- System prompt rebuilt from memory store on every request (always fresh data)
+- Transcript: trimmed to last ~300 words (`CHAT_TRANSCRIPT_WORDS` in config.py)
+- Full report: excluded from context (redundant — scores/flags/features already capture the substance)
+- All 31 linguistic features + all 31 baselines: always included (cheap, key-value pairs)
+- Conversation history: last 10 turns sent to LLM (`CHAT_HISTORY_TURNS` in config.py)
+- No `max_output_tokens` cap — system prompt instructs concise responses; Gemini's token limit caused premature truncation when set explicitly
+
+### Safety Constraints (Non-Negotiable)
+- Never diagnoses — screening observations only
+- Never compares subjects — scoped to current subject only
+- Never provides medical advice — always recommends professional consultation
+- Enforced in system prompt (`app/chat.py::build_system_prompt`), not bypassable by user input
+- Gemini safety filters set to `BLOCK_NONE` (all categories) — necessary because platform-level filters truncate legitimate health screening discussion
+
+### Key Files
+- Backend: `app/chat.py` (LLM singleton, context builder, system prompt, `handle_chat()`)
+- Endpoint: `app/api.py` (`POST /api/subjects/{id}/chat` with `ChatRequest` model)
+- Frontend: `components/chat/` (ChatContainer, ChatPopup, ChatSidebar, ChatInput, ChatMessageList)
+- Config: `config.py` — `CHAT_MAX_OUTPUT_TOKENS`, `CHAT_HISTORY_TURNS`, `CHAT_TRANSCRIPT_WORDS`
+- LLM: Reuses `REPORT_LLM_MODEL` (Gemini 2.5 Flash) — same API key, separate singleton instance
+
+### What Does NOT Change
+- Memory system (`memory_base.py`, `memory_local.py`) — chat reads via existing methods, no writes
+- LangGraph pipeline (`agents/`) — untouched; pipeline has no awareness of chat
+- Existing dashboard components (ScoreTimeline, ChangeAlerts, etc.) — untouched; only parent grid adjusts for sidebar mode
 
 ---
 

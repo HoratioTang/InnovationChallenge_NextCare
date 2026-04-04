@@ -6,6 +6,7 @@ import type {
   ChangeSummary,
   BaselineStats,
   FeatureTrendPoint,
+  ChatMessage,
 } from "../types";
 
 const API_BASE = "http://localhost:8000";
@@ -99,4 +100,27 @@ export async function fetchFeatureTrends(subjectId: string, features: string[]):
 export async function deleteSubject(subjectId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/subjects/${encodeURIComponent(subjectId)}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete subject");
+}
+
+// ── Dashboard Chatbot ──
+
+export async function sendChatMessage(
+  subjectId: string,
+  message: string,
+  history: ChatMessage[],
+): Promise<string> {
+  const res = await fetch(
+    `${API_BASE}/api/subjects/${encodeURIComponent(subjectId)}/chat`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, history: history.slice(-10) }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || "Chat request failed");
+  }
+  const data = await res.json();
+  return data.reply;
 }

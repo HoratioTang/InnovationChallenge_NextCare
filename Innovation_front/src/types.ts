@@ -69,3 +69,10 @@ export interface BaselineStats {
   count: number;
   last_value: number;
 }
+
+// ── Dashboard Chatbot ──
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}

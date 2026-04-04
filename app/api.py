@@ -10,6 +10,7 @@ Endpoints:
   GET  /api/subjects/{id}/baselines             — Baseline stats
   GET  /api/subjects/{id}/change-summary        — Change flags vs baseline
   DELETE /api/subjects/{id}                     — Remove a subject
+  POST /api/subjects/{id}/chat                  — Chatbot Q&A about a subject's history
 """
 
 import logging
@@ -255,3 +256,26 @@ async def delete_subject(subject_id: str):
     """Remove a subject and all their data."""
     memory.delete_subject(subject_id)
     return {"status": "deleted", "subject_id": subject_id}
+
+
+# =====================================================================
+# Dashboard chatbot
+# =====================================================================
+
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict] = []
+
+
+@app.post("/api/subjects/{subject_id}/chat")
+async def subject_chat(subject_id: str, request: ChatRequest):
+    """Conversational Q&A about a subject's screening history."""
+    from app.chat import handle_chat
+
+    try:
+        reply = await handle_chat(memory, subject_id, request.message, request.history)
+        return {"reply": reply}
+    except Exception:
+        logger.exception("Chat failed for subject %s", subject_id)
+        return {"reply": "Sorry, I couldn't process that request. Please try again."}
