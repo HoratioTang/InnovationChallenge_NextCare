@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import torch
 
 TARGET_SR = 16000
 CHUNK_DURATION = 2.0
@@ -14,13 +13,26 @@ SEMANTIC_METADATA_PATH = MODEL_DIR / "semantic_metadata.json"
 
 FUSION_WEIGHTS = {"acoustic": 0.5, "semantic": 0.5}
 
+# --- HeAR inference backend ---
+# "local"  = load from models/hear_model_local (needs torch + transformers + hear/ repo)
+# "vertex" = call Vertex AI Model Garden endpoint (needs google-cloud-aiplatform)
+HEAR_BACKEND = os.getenv("HEAR_BACKEND", "local")
 
-if torch.cuda.is_available():
-    DEVICE = "cuda"
-elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-    DEVICE = "mps"
-else:
-    DEVICE = "cpu"
+# Only needed when HEAR_BACKEND = "vertex"
+VERTEX_PROJECT = os.getenv("VERTEX_PROJECT", "")
+VERTEX_REGION = os.getenv("VERTEX_REGION", "asia-southeast1")
+VERTEX_ENDPOINT_ID = os.getenv("VERTEX_ENDPOINT_ID", "")
+
+# Device detection — skip if torch not installed (e.g., Cloud Run with Vertex backend)
+DEVICE = "cpu"
+try:
+    import torch
+    if torch.cuda.is_available():
+        DEVICE = "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        DEVICE = "mps"
+except ImportError:
+    pass
 # ============================================================
 # Feature Calculation Settings
 # ============================================================
@@ -121,7 +133,7 @@ CHAT_TRANSCRIPT_WORDS = 300      # Trim transcript to last N words in context
 # ============================================================
 
 MEMORY_BACKEND = os.getenv("MEMORY_BACKEND", "local")  # "local" or "supabase"
-MEMORY_LOCAL_PATH = "screening_history.json"
+MEMORY_LOCAL_PATH = os.getenv("MEMORY_LOCAL_PATH", "screening_history.json")
 
 # Feature groups — used for change detection
 FEATURE_GROUPS = {
