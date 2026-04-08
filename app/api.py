@@ -9,6 +9,7 @@ Endpoints:
   GET  /api/subjects/{id}/feature-trends        — Feature time series
   GET  /api/subjects/{id}/baselines             — Baseline stats
   GET  /api/subjects/{id}/change-summary        — Change flags vs baseline
+  GET  /api/subjects/{id}/care-plan              — Personalized care activities
   DELETE /api/subjects/{id}                     — Remove a subject
   POST /api/subjects/{id}/chat                  — Chatbot Q&A about a subject's history
 """
@@ -31,6 +32,7 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from agents.graph import build_graph
+from app.care_plan import build_care_plan
 from app.pdf_report import generate_report_pdf
 from config import MEMORY_BACKEND, MEMORY_LOCAL_PATH
 
@@ -251,6 +253,18 @@ async def get_change_summary(subject_id: str):
     }
 
 
+@app.get("/api/subjects/{subject_id}/care-plan")
+async def get_care_plan(subject_id: str):
+    """Get personalized care activities based on the subject's change flags.
+
+    Returns the same shape for unknown subjects (empty flags, session_count=0),
+    matching the lenient pattern used by /change-summary.
+    """
+    flags = memory.get_change_flags(subject_id)
+    history = memory.get_history(subject_id)
+    return build_care_plan(flags, session_count=len(history))
+
+
 @app.delete("/api/subjects/{subject_id}")
 async def delete_subject(subject_id: str):
     """Remove a subject and all their data."""
@@ -266,15 +280,22 @@ async def delete_subject(subject_id: str):
 class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []
+    mode: str = "dashboard"  # "dashboard" or "profile"
 
 
 @app.post("/api/subjects/{subject_id}/chat")
 async def subject_chat(subject_id: str, request: ChatRequest):
-    """Conversational Q&A about a subject's screening history."""
+    """Conversational Q&A about a subject's screening history or care plan."""
     from app.chat import handle_chat
 
     try:
-        reply = await handle_chat(memory, subject_id, request.message, request.history)
+        reply = await handle_chat(
+            memory,
+            subject_id,
+            request.message,
+            request.history,
+            mode=request.mode,
+        )
         return {"reply": reply}
     except Exception:
         logger.exception("Chat failed for subject %s", subject_id)

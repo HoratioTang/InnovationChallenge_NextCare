@@ -70,6 +70,32 @@ export interface BaselineStats {
   last_value: number;
 }
 
+// ── Care Plan (Profile page) ──
+
+export interface CareActivity {
+  name: string;
+  description: string;
+  difficulty: 'easy' | 'moderate';
+  duration: string;
+  frequency: string;
+}
+
+export interface CareGroup {
+  group: string;
+  domain: string;
+  description: string;
+  activities: CareActivity[];
+  reason?: string; // only present on priority entries
+}
+
+export interface CarePlan {
+  session_count: number;
+  has_enough_data: boolean;
+  is_stable: boolean;
+  priority: CareGroup[];
+  general: CareGroup[];
+}
+
 // ── Dashboard Chatbot ──
 
 export interface ChatMessage {

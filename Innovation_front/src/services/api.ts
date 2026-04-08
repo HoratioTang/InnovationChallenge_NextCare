@@ -6,6 +6,7 @@ import type {
   ChangeSummary,
   BaselineStats,
   FeatureTrendPoint,
+  CarePlan,
   ChatMessage,
 } from "../types";
 
@@ -97,6 +98,12 @@ export async function fetchFeatureTrends(subjectId: string, features: string[]):
   return res.json();
 }
 
+export async function fetchCarePlan(subjectId: string): Promise<CarePlan> {
+  const res = await fetch(`${API_BASE}/api/subjects/${encodeURIComponent(subjectId)}/care-plan`);
+  if (!res.ok) throw new Error("Failed to fetch care plan");
+  return res.json();
+}
+
 export async function deleteSubject(subjectId: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/subjects/${encodeURIComponent(subjectId)}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete subject");
@@ -104,17 +111,20 @@ export async function deleteSubject(subjectId: string): Promise<void> {
 
 // ── Dashboard Chatbot ──
 
+export type ChatMode = "dashboard" | "profile";
+
 export async function sendChatMessage(
   subjectId: string,
   message: string,
   history: ChatMessage[],
+  mode: ChatMode = "dashboard",
 ): Promise<string> {
   const res = await fetch(
     `${API_BASE}/api/subjects/${encodeURIComponent(subjectId)}/chat`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, history: history.slice(-10) }),
+      body: JSON.stringify({ message, history: history.slice(-10), mode }),
     },
   );
   if (!res.ok) {

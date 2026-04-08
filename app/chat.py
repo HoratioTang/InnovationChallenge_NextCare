@@ -1,7 +1,11 @@
-"""Dashboard chatbot — subject-scoped conversational Q&A over screening history.
+"""Subject-scoped conversational Q&A — two modes.
 
-Queries the memory store for subject context, builds a system prompt with
-safety constraints, and sends to Gemini for a concise caregiver-friendly reply.
+- "dashboard" mode: caregiver questions about screening history, scores, trends
+- "profile" mode: caregiver questions about the recommended care activities
+  (why, how to adapt, what they target). Used by the Profile / Daily Care page.
+
+Each mode has its own context builder + system prompt. They share the LLM
+singleton, the safety filters, and the conversation history handling.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from typing import Optional
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
+from app.care_plan import build_care_plan
 from config import (
     CHAT_HISTORY_TURNS,
     CHAT_MAX_OUTPUT_TOKENS,
@@ -182,6 +187,105 @@ def _format_features(features: Optional[dict]) -> str:
     return "\n".join(lines) if lines else "No features available."
 
 
+# ---------------------------------------------------------------------------
+# Profile mode — context + system prompt
+# ---------------------------------------------------------------------------
+
+def build_profile_context(memory, subject_id: str) -> Optional[dict]:
+    """Assemble care-activity context for the Profile chat. Returns None if
+    the subject is unknown.
+
+    Profile mode intentionally excludes scores, baselines, and the transcript —
+    those belong on the Dashboard. It includes the change flags (so the LLM
+    can explain *why* a priority activity is recommended) and the deterministic
+    care plan (so it can ground answers in the actual suggested activities).
+    """
+    subjects = memory.list_subjects()
+    subject = next((s for s in subjects if s["subject_id"] == subject_id), None)
+    if not subject:
+        return None
+
+    history = memory.get_history(subject_id)
+    change_flags = memory.get_change_flags(subject_id)
+    care_plan = build_care_plan(change_flags, session_count=len(history))
+
+    return {
+        "subject_name": subject.get("name", subject_id),
+        "session_count": subject.get("session_count", len(history)),
+        "change_flags": change_flags,
+        "care_plan": care_plan,
+    }
+
+
+def build_profile_system_prompt(context: dict) -> str:
+    care_plan = context["care_plan"]
+    return f"""You are a warm, practical assistant for a caregiver who is looking at the Daily Care page in NextCare for "{context['subject_name']}". This page shows cognitive activities personalized to {context['subject_name']}'s recent screening results.
+
+The caregiver may ask:
+- WHY a specific activity is recommended
+- HOW to do an activity, or how to adapt it (e.g., "she gets frustrated easily", "he finds it too easy")
+- WHAT cognitive skill an activity targets
+- General questions about cognitive engagement at home
+
+CRITICAL CONSTRAINTS:
+- This is a SCREENING tool, NOT a diagnostic tool. NEVER say someone has or doesn't have dementia.
+- Do not predict disease progression. Do not give medical advice.
+- Never compare {context['subject_name']} to other people or population norms.
+- Do not go deep into screening scores on this page — if the caregiver asks about scores, gently redirect them to the History page.
+- For any medical concern, always recommend consulting a healthcare professional.
+
+RESPONSE GUIDELINES:
+- Be warm, encouraging, and concrete.
+- Refer to the specific activities listed in CONTEXT — do not invent new ones.
+- When the caregiver asks about a priority activity, link it to the flagged area it addresses (use the "Recommended" reasons in CONTEXT).
+- When difficulty is mentioned, suggest gentle modifications drawn from the activity's purpose.
+- Keep answers concise — 2-4 sentences for simple questions, up to a paragraph for complex ones.
+
+CONTEXT:
+Subject: {context['subject_name']}
+Sessions on record: {context['session_count']}
+Has enough data for personalization: {care_plan['has_enough_data']}
+Profile is currently stable (no flagged changes): {care_plan['is_stable']}
+
+Priority areas (recently flagged in screenings):
+{_format_priority_groups(care_plan['priority'])}
+
+Priority activities (recommended because of the flags above):
+{_format_activities(care_plan['priority'])}
+
+Ongoing activities (general cognitive maintenance):
+{_format_activities(care_plan['general'])}
+"""
+
+
+def _format_priority_groups(priority: list[dict]) -> str:
+    if not priority:
+        return "No significant changes detected — no priority areas at this time."
+    lines = []
+    for entry in priority:
+        reason = entry.get("reason", "")
+        lines.append(f"- {entry['domain']} ({entry['group']}): {reason}")
+    return "\n".join(lines)
+
+
+def _format_activities(groups: list[dict]) -> str:
+    if not groups:
+        return "(none)"
+    lines = []
+    for entry in groups:
+        lines.append(f"\n{entry['domain']}:")
+        for act in entry["activities"]:
+            lines.append(
+                f"  - {act['name']} ({act['duration']}, {act['frequency']}, {act['difficulty']}): "
+                f"{act['description']}"
+            )
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Shared formatters (dashboard mode)
+# ---------------------------------------------------------------------------
+
 def _format_baselines(baselines: dict) -> str:
     if not baselines:
         return "No baselines established yet."
@@ -202,13 +306,24 @@ async def handle_chat(
     subject_id: str,
     message: str,
     history: list[dict],
+    mode: str = "dashboard",
 ) -> str:
-    """Process a chat message and return the LLM response."""
-    context = build_chat_context(memory, subject_id)
-    if context is None:
-        return "I don't have any screening data for this subject yet."
+    """Process a chat message and return the LLM response.
 
-    system_prompt = build_system_prompt(context)
+    `mode` selects which context builder + system prompt to use:
+    - "dashboard" (default): screening results, scores, baselines, transcript
+    - "profile": care activities, change flags, no scores
+    """
+    if mode == "profile":
+        context = build_profile_context(memory, subject_id)
+        if context is None:
+            return "I don't have any data for this subject yet."
+        system_prompt = build_profile_system_prompt(context)
+    else:
+        context = build_chat_context(memory, subject_id)
+        if context is None:
+            return "I don't have any screening data for this subject yet."
+        system_prompt = build_system_prompt(context)
 
     # Build langchain message list
     messages = [SystemMessage(content=system_prompt)]

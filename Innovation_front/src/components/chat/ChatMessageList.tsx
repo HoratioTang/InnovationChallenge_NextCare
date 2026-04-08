@@ -2,21 +2,36 @@ import { useEffect, useRef, type FC } from 'react';
 import { Bot } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import type { ChatMessage } from '../../types';
+import type { ChatMode } from '../../services/api';
 
 interface ChatMessageListProps {
   messages: ChatMessage[];
   loading: boolean;
   onSend?: (message: string) => void;
+  mode?: ChatMode;
 }
 
-const STARTER_PROMPTS = [
-  'Summarize the screening results so far',
-  'What changes should I be concerned about?',
-  'Explain the scores in simple terms',
-  'What should I discuss with the doctor?',
-];
+const STARTER_PROMPTS: Record<ChatMode, string[]> = {
+  dashboard: [
+    'Summarize the screening results so far',
+    'What changes should I be concerned about?',
+    'Explain the scores in simple terms',
+    'What should I discuss with the doctor?',
+  ],
+  profile: [
+    'Why are these activities recommended?',
+    'How do I adapt an activity if it feels too easy?',
+    'What does it mean if vocabulary diversity is flagged?',
+    'Which activity should we start with today?',
+  ],
+};
 
-export const ChatMessageList: FC<ChatMessageListProps> = ({ messages, loading, onSend }) => {
+const EMPTY_SUBTITLES: Record<ChatMode, string> = {
+  dashboard: "Ask me anything about this subject's screening history",
+  profile: "Ask me about the recommended activities and how to adapt them",
+};
+
+export const ChatMessageList: FC<ChatMessageListProps> = ({ messages, loading, onSend, mode = 'dashboard' }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,11 +44,11 @@ export const ChatMessageList: FC<ChatMessageListProps> = ({ messages, loading, o
       <div className="flex-1 flex flex-col items-center justify-center px-4">
         <Bot size={32} className="text-blue-300 mb-3" />
         <p className="text-sm text-slate-400 mb-4 text-center">
-          Ask me anything about this subject's screening history
+          {EMPTY_SUBTITLES[mode]}
         </p>
         {onSend && (
           <div className="flex flex-wrap gap-2 justify-center">
-            {STARTER_PROMPTS.map(prompt => (
+            {STARTER_PROMPTS[mode].map(prompt => (
               <button
                 key={prompt}
                 onClick={() => onSend(prompt)}

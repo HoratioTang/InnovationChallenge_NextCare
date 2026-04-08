@@ -3,6 +3,7 @@ import { Bot, PanelRightClose } from 'lucide-react';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import type { ChatMessage } from '../../types';
+import type { ChatMode } from '../../services/api';
 
 interface ChatSidebarProps {
   subjectId: string;
@@ -10,6 +11,7 @@ interface ChatSidebarProps {
   loading: boolean;
   onSend: (message: string) => void;
   onCollapse: () => void;
+  mode?: ChatMode;
 }
 
 export const ChatSidebar: FC<ChatSidebarProps> = ({
@@ -18,6 +20,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
   loading,
   onSend,
   onCollapse,
+  mode = 'dashboard',
 }) => {
   return (
     <div className="h-full bg-white rounded-xl border border-slate-200 shadow-lg shadow-slate-200/60
@@ -27,7 +30,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
         <div className="flex items-center gap-2">
           <Bot size={18} className="text-blue-600" />
           <span className="font-semibold text-sm text-slate-800">
-            Ask about {subjectId}
+            {mode === 'profile' ? `Ask about activities for ${subjectId}` : `Ask about ${subjectId}`}
           </span>
         </div>
         <button
@@ -40,7 +43,7 @@ export const ChatSidebar: FC<ChatSidebarProps> = ({
       </div>
 
       {/* Messages */}
-      <ChatMessageList messages={messages} loading={loading} onSend={onSend} />
+      <ChatMessageList messages={messages} loading={loading} onSend={onSend} mode={mode} />
 
       {/* Input */}
       <ChatInput onSend={onSend} disabled={loading} />

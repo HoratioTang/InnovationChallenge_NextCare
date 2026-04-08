@@ -10,9 +10,18 @@ import { Processing } from './pages/Processing';
 import { History } from './pages/History';
 import { SubjectDashboard } from './pages/SubjectDashboard';
 import { Summary } from './pages/Summary';
+import { Profile } from './pages/Profile';
+import { ActivitySuggestions } from './pages/ActivitySuggestions';
 import type { ScreeningResult } from './types';
 
-type Page = 'recording' | 'processing' | 'history' | 'subjectDashboard' | 'summary';
+type Page =
+  | 'recording'
+  | 'processing'
+  | 'history'
+  | 'subjectDashboard'
+  | 'summary'
+  | 'profile'
+  | 'profileDetail';
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState<Page>('recording');
@@ -20,6 +29,7 @@ export default function App() {
   const [results, setResults] = useState<ScreeningResult | null>(null);
   const [subjectId, setSubjectId] = useState<string>('');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
+  const [selectedProfileId, setSelectedProfileId] = useState<string>('');
 
   const handleBackToRecording = () => {
     setAudioFile(null);
@@ -57,6 +67,10 @@ export default function App() {
             results={results}
             subjectId={subjectId}
             onBackToHistory={() => setCurrentPage('history')}
+            onViewCarePlan={(id) => {
+              setSelectedProfileId(id);
+              setCurrentPage('profileDetail');
+            }}
           />
         );
       case 'history':
@@ -73,6 +87,27 @@ export default function App() {
           <SubjectDashboard
             subjectId={selectedSubjectId}
             onBack={() => setCurrentPage('history')}
+          />
+        );
+      case 'profile':
+        return (
+          <Profile
+            onSelectProfile={(id) => {
+              setSelectedProfileId(id);
+              setCurrentPage('profileDetail');
+            }}
+          />
+        );
+      case 'profileDetail':
+        return (
+          <ActivitySuggestions
+            subjectId={selectedProfileId}
+            onBack={() => setCurrentPage('profile')}
+            onViewDashboard={(id) => {
+              setSelectedSubjectId(id);
+              setCurrentPage('subjectDashboard');
+            }}
+            onRunNewScreening={() => setCurrentPage('recording')}
           />
         );
       default:

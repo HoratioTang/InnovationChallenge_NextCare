@@ -10,7 +10,7 @@ import {
   History,
   Calendar,
   Download,
-  UserPlus,
+  Heart,
   FileText,
   ChevronDown,
   ChevronUp
@@ -24,6 +24,7 @@ interface SummaryProps {
   results: ScreeningResult | null;
   subjectId: string;
   onBackToHistory: () => void;
+  onViewCarePlan: (subjectId: string) => void;
 }
 
 function getScoreStyle(score: number | null) {
@@ -98,7 +99,7 @@ function extractSummaryParagraph(report: string | null): string {
   return report.slice(0, 500);
 }
 
-export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory }) => {
+export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory, onViewCarePlan }) => {
   const handleDownloadPdf = useCallback(async () => {
     if (!results) return;
     try {
@@ -244,9 +245,10 @@ export const Summary: FC<SummaryProps> = ({ results, subjectId, onBackToHistory 
             onClick={handleDownloadPdf}
           />
           <NextStepCard
-            icon={UserPlus}
-            title="Caregiver Access"
-            desc="Grant viewing permissions"
+            icon={Heart}
+            title="Care Activities"
+            desc="Personalized suggestions"
+            onClick={() => onViewCarePlan(subjectId)}
           />
         </div>
       </div>

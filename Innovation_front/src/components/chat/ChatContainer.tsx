@@ -1,15 +1,16 @@
 import { useState, useEffect, type FC } from 'react';
 import { ChatPopup } from './ChatPopup';
 import { ChatSidebar } from './ChatSidebar';
-import { sendChatMessage } from '../../services/api';
+import { sendChatMessage, type ChatMode } from '../../services/api';
 import type { ChatMessage } from '../../types';
 
 interface ChatContainerProps {
   subjectId: string;
   onSidebarToggle?: (open: boolean) => void;
+  mode?: ChatMode;
 }
 
-export const ChatContainer: FC<ChatContainerProps> = ({ subjectId, onSidebarToggle }) => {
+export const ChatContainer: FC<ChatContainerProps> = ({ subjectId, onSidebarToggle, mode = 'dashboard' }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [sidebarMode, setSidebarMode] = useState(false);
@@ -26,7 +27,7 @@ export const ChatContainer: FC<ChatContainerProps> = ({ subjectId, onSidebarTogg
 
     try {
       const history = messages.map(m => ({ role: m.role, content: m.content }));
-      const reply = await sendChatMessage(subjectId, text, history);
+      const reply = await sendChatMessage(subjectId, text, history, mode);
       setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
     } catch {
       setMessages(prev => [
@@ -57,6 +58,7 @@ export const ChatContainer: FC<ChatContainerProps> = ({ subjectId, onSidebarTogg
           loading={loading}
           onSend={handleSend}
           onCollapse={collapseToPopup}
+          mode={mode}
         />
       </div>
     );
@@ -69,6 +71,7 @@ export const ChatContainer: FC<ChatContainerProps> = ({ subjectId, onSidebarTogg
       loading={loading}
       onSend={handleSend}
       onExpandToSidebar={expandToSidebar}
+      mode={mode}
     />
   );
 };

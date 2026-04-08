@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { ChatMessageList } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 import type { ChatMessage } from '../../types';
+import type { ChatMode } from '../../services/api';
 
 interface ChatPopupProps {
   subjectId: string;
@@ -11,6 +12,7 @@ interface ChatPopupProps {
   loading: boolean;
   onSend: (message: string) => void;
   onExpandToSidebar: () => void;
+  mode?: ChatMode;
 }
 
 export const ChatPopup: FC<ChatPopupProps> = ({
@@ -19,6 +21,7 @@ export const ChatPopup: FC<ChatPopupProps> = ({
   loading,
   onSend,
   onExpandToSidebar,
+  mode = 'dashboard',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -41,7 +44,7 @@ export const ChatPopup: FC<ChatPopupProps> = ({
               <div className="flex items-center gap-2">
                 <Bot size={18} className="text-blue-600" />
                 <span className="font-semibold text-sm text-slate-800">
-                  Ask about {subjectId}
+                  {mode === 'profile' ? `Ask about activities for ${subjectId}` : `Ask about ${subjectId}`}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -62,7 +65,7 @@ export const ChatPopup: FC<ChatPopupProps> = ({
             </div>
 
             {/* Messages */}
-            <ChatMessageList messages={messages} loading={loading} onSend={onSend} />
+            <ChatMessageList messages={messages} loading={loading} onSend={onSend} mode={mode} />
 
             {/* Input */}
             <ChatInput onSend={onSend} disabled={loading} />

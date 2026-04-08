@@ -18,12 +18,13 @@ interface SidebarProps {
 
 const SCREENING_PAGES = new Set(['recording', 'processing', 'summary']);
 const HISTORY_PAGES = new Set(['history', 'subjectDashboard']);
+const PROFILE_PAGES = new Set(['profile', 'profileDetail']);
 
 export const Sidebar: FC<SidebarProps> = ({ isOpen, onToggle, onNavigate, currentPage = '' }) => {
   const sidebarItems = [
     { icon: LayoutGrid, label: 'Screening', page: 'recording', isActive: SCREENING_PAGES.has(currentPage) },
     { icon: History, label: 'History', page: 'history', isActive: HISTORY_PAGES.has(currentPage) },
-    { icon: Users, label: 'Patients', page: '', isActive: false },
+    { icon: Users, label: 'Daily Care', page: 'profile', isActive: PROFILE_PAGES.has(currentPage) },
     { icon: Settings, label: 'Settings', page: '', isActive: false },
   ];
 
