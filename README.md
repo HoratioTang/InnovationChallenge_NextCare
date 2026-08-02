@@ -1,5 +1,6 @@
 # Dementia Screening System
 
+Demo Video: https://youtu.be/0h3oDDz8Zeg
 A non-invasive, home-based dementia screening tool that analyses conversational audio recordings using parallel multimodal fusion. One branch analyses **how** a person sounds (acoustic), the other analyses **what** they say (semantic). Results are fused and an LLM generates a caregiver-facing report.
 
 Built for the NUS-SYNAPXE-IMDA Innovation Challenge 2026. Supports English (Singlish) and Mandarin.
